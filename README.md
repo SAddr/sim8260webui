@@ -92,7 +92,7 @@ simcom-webui/
 
 ## 🚀 快速开始
 
-> 前提：模块已开 ADB（`AT+CUSBCFG=usbadb,1`）、已装 Entware + lighttpd（`opkg install lighttpd`）
+> 前提：模块已开 ADB（`AT+CUSBCFG=usbadb,1`）、使用自带的lighttpd
 
 1. 把 `adb.exe` + `AdbWinApi.dll` + `AdbWinUsbApi.dll` 放到本项目目录（与 `deploy_to_modem.bat` 同级，可选，否则用 PATH 里的 adb）；
 2. 双击 `deploy_to_modem.bat`——脚本会自动探测设备 → `adb root` → 推送文件 → 跑 `install.sh`；
