@@ -1,0 +1,86 @@
+#!/bin/sh
+# =====================================================================
+# Simcom WebUI - 设备静态信息 CGI（带内存缓存）
+#
+# 厂商(CGMI)/型号(CGMM)/固件(CGMR)/IMEI(CGSN)/IMSI(CIMI)/ICCID(CICCID)
+# 这些值在模块运行期间不变（除非换 SIM 卡或升级固件）。第一次通过 AT 获取后
+# 缓存到内存 tmpfs（$AT_RUN_DIR/cache/deviceinfo），后续直接读缓存，不再每次
+# 刷新都发 AT 查询 —— 这是「页面刷新接口慢」的主要优化点之一。
+#
+# 输出 key=value，前端按行解析。
+# =====================================================================
+. "$(dirname "$0")/libat.sh"
+
+echo "Content-Type: text/plain; charset=utf-8"
+echo "Cache-Control: no-store"
+echo ""
+
+CACHE_FILE="$AT_RUN_DIR/cache/deviceinfo"
+
+# 命中缓存：直接返回（不碰 AT 串口）
+if [ -s "$CACHE_FILE" ]; then
+    cat "$CACHE_FILE"
+    exit 0
+fi
+
+AT_DEVICE=$(find_at_device) || { echo "ERROR: no AT serial device"; exit 1; }
+
+# 未命中：需要 AT 获取，抢串口锁（防止并发重复查询）
+if ! acquire_at_lock "$AT_LOCK"; then
+    # 抢锁失败（可能有并发请求正在获取）：再读一次缓存，没有再报错
+    [ -s "$CACHE_FILE" ] && { cat "$CACHE_FILE"; exit 0; }
+    echo "ERROR: AT device busy"
+    exit 1
+fi
+
+# 双检：拿到锁后缓存可能已被并发请求写好
+if [ -s "$CACHE_FILE" ]; then
+    cat "$CACHE_FILE"
+    exit 0
+fi
+
+flush_at_buffer "$AT_DEVICE"
+
+# 静态信息合并查询。CGSN 单独发：部分固件返回 +CME ERROR: memory failure，
+# 放进分号批量里会中断后续子命令。
+_raw=$(send_at_batch "$AT_DEVICE" "AT+CGMI;+CGMM;+CGMR;+CIMI;+CICCID" 5)
+_imei=$(send_at "$AT_DEVICE" "AT+CGSN" 3)
+
+# 解析合并命令响应：CGMI/CGMM/CIMI 为裸文本（按序前 3 个），CGMR/CICCID 带前缀
+_info=$(printf '%s\n' "$_raw" | awk '
+    {
+        gsub(/\r/, "")
+        if ($0 == "" || $0 == "OK" || $0 == "ERROR") next
+        if ($0 ~ /^AT/) next
+        if ($0 ~ /^\+CME ERROR/) next
+        if ($0 ~ /^\+CGMR:/)  { v=$0; sub(/^\+CGMR:[ \t]*/, "", v);  firm=v;  next }
+        if ($0 ~ /^\+ICCID:/) { v=$0; sub(/^\+ICCID:[ \t]*/, "", v); iccid=v; next }
+        if ($0 ~ /^\+/) next
+        if (manu == "")  manu = $0
+        else if (model == "") model = $0
+        else if (imsi == "")  imsi = $0
+    }
+    END {
+        print "MANU="  (manu  ? manu  : "")
+        print "MODEL=" (model ? model : "")
+        print "FIRM="  (firm  ? firm  : "")
+        print "IMSI="  (imsi  ? imsi  : "")
+        print "ICCID=" (iccid ? iccid : "")
+    }
+')
+
+# 解析 IMEI（CGSN 单独响应，取第一个 >=10 位纯数字）
+_imei_v=$(printf '%s\n' "$_imei" | awk '
+    { gsub(/\r/, ""); if ($0 ~ /^[0-9]{10,}$/ && imei == "") imei = $0 }
+    END { print (imei ? imei : "") }
+')
+
+_out="${_info}
+IMEI=${_imei_v}"
+
+mkdir -p "$AT_RUN_DIR/cache" 2>/dev/null
+printf '%s\n' "$_out" > "$CACHE_FILE" 2>/dev/null
+chmod 644 "$CACHE_FILE" 2>/dev/null
+
+# 返回结果
+printf '%s\n' "$_out"

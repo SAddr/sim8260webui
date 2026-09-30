@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <title>SIM8260 控制面板</title>
+  <script src="js/wb-theme.js"></script>
+<link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2338bdf8'/><text y='.9em' x='50' text-anchor='middle' font-size='60' fill='%230a0e1a' font-weight='bold' font-family='sans-serif'>S</text></svg>" />
+</head>
+<body>
+
+<!-- ===== 顶栏 ===== -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-title">SIM8260 Control Center</div>
+      <div class="brand-subtitle" id="brand-sub">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <a href="index.html" class="nav-tab active">总览</a>
+    <a href="signal.html" class="nav-tab">信号</a>
+    <a href="network.html" class="nav-tab">网络</a>
+    <a href="device.html" class="nav-tab">设备</a>
+    <a href="sms.html" class="nav-tab">短信</a>
+    <a href="atcmd.html" class="nav-tab">AT 命令</a>
+    <a href="settings.html" class="nav-tab">设置</a>
+  </nav>
+  <div class="topbar-foot">
+    <span class="status-pill online" id="status-pill">
+      <span class="status-dot"></span>
+      <span id="status-text">已连接</span>
+    </span>
+  </div>
+</header>
+
+<!-- ===== 主内容 ===== -->
+<main class="container">
+  <div>
+    <h1 class="page-title">仪表盘</h1>
+    <p class="page-subtitle">实时监控模块运行状态与信号质量</p>
+  </div>
+
+  <!-- 第一行：KPI 指标卡 -->
+  <div class="grid grid-dash">
+    <!-- 网络状态 -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📡</span> 网络模式</div>
+      </div>
+      <div class="metric-value" id="sys-mode">
+        <span class="skeleton" style="display:inline-block;width:120px;height:36px;"></span>
+      </div>
+      <div class="metric-label" id="sys-sub">运营商 / 频段</div>
+    </div>
+
+    <!-- 信号强度 -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📶</span> 信号强度 (RSRP)</div>
+        <div class="card-action" onclick="refreshAll()">⟳ 刷新</div>
+      </div>
+      <div class="metric-value" id="rsrp-val">
+        <span class="skeleton" style="display:inline-block;width:100px;height:36px;"></span>
+      </div>
+      <div class="metric-label" id="rsrp-label">参考信号接收功率</div>
+      <div class="metric-trend up" id="rsrp-trend">──</div>
+    </div>
+
+    <!-- 速率 -->
+    <div class="card col-4" id="dl-rate-card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">⚡</span> 下行流数 / 调制</div>
+      </div>
+      <div class="metric-value" id="dl-layers">
+        <span class="skeleton" style="display:inline-block;width:100px;height:36px;"></span>
+      </div>
+      <div class="metric-label" id="dl-modul">下行调制方式</div>
+      <div class="metric-trend">
+        <span id="mcs-info">MCS: ──</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第二行：信号环 + 天线 + 设备信息 -->
+  <div class="grid grid-dash" style="margin-top:20px;">
+    <!-- 信号详情环 -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📊</span> 5G NR 信号质量</div>
+        <div class="card-action" id="rat-label">NR5G</div>
+      </div>
+      <div class="signal-ring-wrap">
+        <div class="signal-ring">
+          <svg viewBox="0 0 120 120">
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#7c8cff" />
+                <stop offset="100%" stop-color="#9c7cf5" />
+              </linearGradient>
+              <linearGradient id="ringGradLte" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#7c8cff" />
+                <stop offset="100%" stop-color="#9c7cf5" />
+              </linearGradient>
+            </defs>
+            <circle class="signal-ring-bg" cx="60" cy="60" r="52"></circle>
+            <g class="signal-ring-ticks">
+              <line x1="60" y1="4" x2="60" y2="10" />
+              <line x1="113" y1="33" x2="108" y2="37" />
+              <line x1="116" y1="60" x2="110" y2="60" />
+              <line x1="113" y1="87" x2="108" y2="83" />
+              <line x1="60" y1="116" x2="60" y2="110" />
+              <line x1="7" y1="87" x2="12" y2="83" />
+              <line x1="4" y1="60" x2="10" y2="60" />
+              <line x1="7" y1="33" x2="12" y2="37" />
+            </g>
+            <circle class="signal-ring-fg" cx="60" cy="60" r="52"
+                    stroke-dasharray="0 326.7"
+                    id="signal-ring-fg"></circle>
+          </svg>
+          <div class="signal-ring-text">
+            <div class="num" id="sinr-num">--</div>
+            <div class="lbl">SINR (dB)</div>
+          </div>
+        </div>
+        <div class="signal-detail">
+          <div class="signal-row"><span class="k">RSRP</span><span class="v" id="detail-rsrp">-- dBm</span></div>
+          <div class="signal-row"><span class="k">RSRQ</span><span class="v" id="detail-rsrq">-- dB</span></div>
+          <div class="signal-row"><span class="k">SINR</span><span class="v" id="detail-sinr">-- dB</span></div>
+          <div class="signal-row"><span class="k">RSSI</span><span class="v" id="detail-rssi">-- dBm</span></div>
+          <div class="signal-row"><span class="k">带宽</span><span class="v" id="detail-bw">--</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 根天线 -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📡</span> 天线信号分布 (4×4 MIMO)</div>
+        <div class="card-action" id="ant-rat">NR5G</div>
+      </div>
+      <div class="antennas">
+        <div class="antenna-bar">
+          <div class="bar"><div class="bar-fill" id="ant0-bar" style="height:0%"></div></div>
+          <div class="val" id="ant0-val">--</div>
+          <div class="name">PRX (主)</div>
+        </div>
+        <div class="antenna-bar">
+          <div class="bar"><div class="bar-fill" id="ant1-bar" style="height:0%"></div></div>
+          <div class="val" id="ant1-val">--</div>
+          <div class="name">DRX1</div>
+        </div>
+        <div class="antenna-bar">
+          <div class="bar"><div class="bar-fill" id="ant2-bar" style="height:0%"></div></div>
+          <div class="val" id="ant2-val">--</div>
+          <div class="name">DRX2</div>
+        </div>
+        <div class="antenna-bar">
+          <div class="bar"><div class="bar-fill" id="ant3-bar" style="height:0%"></div></div>
+          <div class="val" id="ant3-val">--</div>
+          <div class="name">DRX3</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);">
+        <span>弱 -140 dBm</span>
+        <span>强 -40 dBm</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 第三行：设备信息 + 网络状态 -->
+  <div class="grid grid-dash" style="margin-top:20px;">
+    <!-- 设备信息 -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🛠️</span> 设备信息</div>
+        <a href="device.html" class="card-action">详情 →</a>
+      </div>
+      <table class="info-table">
+        <tr><td>厂商</td><td id="dev-manu">--</td></tr>
+        <tr><td>型号</td><td id="dev-model">--</td></tr>
+        <tr><td>固件版本</td><td id="dev-firm">--</td></tr>
+        <tr><td>IMEI</td><td id="dev-imei">--</td></tr>
+        <tr><td>IMSI</td><td id="dev-imsi">--</td></tr>
+        <tr><td>ICCID</td><td id="dev-iccid">--</td></tr>
+      </table>
+    </div>
+
+    <!-- 网络连接 -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🌐</span> 网络连接</div>
+        <a href="network.html" class="card-action">管理 →</a>
+      </div>
+      <table class="info-table">
+        <tr><td>注册状态</td><td id="net-reg">--</td></tr>
+        <tr><td>网络连接</td><td id="ca-status">--</td></tr>
+        <tr><td>APN</td><td id="net-apn">--</td></tr>
+        <tr><td>WWAN IPv4</td><td id="net-ip4">--</td></tr>
+        <tr><td>WWAN IPv6</td><td id="net-ip6">--</td></tr>
+        <tr><td>LN IP / 网关</td><td id="net-lan">--</td></tr>
+        <tr><td>上行发射功率</td><td id="net-txpwr">--</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    Powered by @Valor
+  </div>
+</main>
+
+<script>
+/* ==================== 工具函数 ==================== */
+
+async function sendAT(cmd) {
+  try {
+    const r = await fetch('/cgi-bin/atcmd?cmd=' + encodeURIComponent(cmd));
+    const text = await r.text();
+    return text;
+  } catch (e) {
+    return 'ERROR: ' + e.message;
+  }
+}
+
+// 解析单个 +KEY:value 响应
+function parseLine(text, key) {
+  const re = new RegExp(key + ':\\s*(.+?)(?:\\r|\\n|$)', 'i');
+  const m = text.match(re);
+  return m ? m[1].trim() : null;
+}
+
+// 数字信号到百分比（RSSI范围-140~-40 → 0~100）
+function signalPct(dBm) {
+  if (dBm >= -40) return 100;
+  if (dBm <= -140) return 0;
+  return Math.round((dBm + 140) * 100 / 100);
+}
+
+// SINR 环（-10 ~ 30 → 0~100）
+function sinrPct(s) {
+  if (s >= 30) return 100;
+  if (s <= -10) return 0;
+  return Math.round((s + 10) * 100 / 40);
+}
+
+function setRing(pct) {
+  const c = 2 * Math.PI * 52; // 326.7
+  const off = Math.round(c * pct / 100);
+  document.getElementById('signal-ring-fg').setAttribute('stroke-dasharray', off + ' ' + c);
+}
+
+/* ==================== 主刷新流程 ==================== */
+
+let lastRsrp = null;
+
+// 从合并命令响应里按「逐个命令块」解析。
+// 后端 atcmd 用 send_at_batch 整条发送 ';' 分隔命令，一次串口往返返回所有子响应拼接，
+// 每子命令的响应是「数据行... + OK/ERROR」。数据行带 +XX: 前缀者各归其键；
+// 裸文本命令（CGMI/CGMM/CGMR/CGSN/CIMI/CICCID）按命令顺序依次落到设备信息。
+//
+// 返回 { blocks:{cmd: 该命令的原始文本块}, 见下 }
+function parseMerged(raw) {
+  const lines = raw.split('\n').map(l => l.trimEnd()).filter(Boolean);
+  return lines;
+}
+
+async function refreshAll() {
+  try {
+    // 关键优化：把只读查询合并成一条 ';' 分隔命令（参考项目 get_atcommand 思路）。
+    // 之前用 Promise.all 并发独立请求，每个都 flush(0.3s)+排队 → 整页 6s+。
+    // 合并后只 flush 一次一次串口往返。'%' 已占位避免 ';' 里的特殊字符问题。
+    // 开头 AT+CNWINFO=1 开启上下行流数/调制上报（手册 4.2.17，幂等，每次刷新确保开启），
+    // 随后 +CNWINFO? 才能返回 DL_Layers/DL_MOD/MCS/CQI 等字段。
+    const all = await sendAT(
+      'AT+CNWINFO=1;+CPSI?;+CRSSI?;+CQCMAP="LANIP";+CEREG?;+C5GREG?;+CNWINFO?;+CGDCONT?'
+    );
+
+    // ---- 统一清洗：去行首空格、去命令回显（以 AT 开头）、去空行、去裸 OK/ERROR ----
+    const lines = all.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(Boolean);
+
+    // key 提取器：按 +KEY: 前缀抓行（合并后各命令数据行带前缀）
+    const grab = (prefix) => lines.filter(l => l.startsWith('+' + prefix + ':')).join('\n');
+    const grabFirst = (prefix) => {
+      const hit = lines.find(l => l.startsWith('+' + prefix + ':'));
+      return hit ? hit.replace(/^\+[A-Z0-9]+:\s*/, '') : '';
+    };
+
+    parseCPSI(grab('CPSI'));
+    parseCRSSI(grab('CRSSI'));
+    parseQMAP(grab('CQCMAP'));
+    parseNetInfo(grab('CNWINFO'));
+    parseAPN(grab('CGDCONT'));
+
+    // 注册状态（+CEREG/+C5GREG）
+    const reg4 = grabFirst('CEREG');
+    const reg5 = grabFirst('C5GREG');
+    parseReg('+CEREG:' + reg4 + (reg5 ? '\n+C5GREG:' + reg5 : ''));
+
+    // 设备静态信息（厂商/型号/固件/IMEI/IMSI/ICCID）走独立缓存接口 deviceinfo，
+    // 不再并入合并 AT 命令 —— 这些值运行期不变，缓存后无需每次刷新都查串口。
+    loadDeviceInfo();
+
+    // WWAN 的 IPv4/IPv6 走 +CGPADDR 独立查询：该命令遍历 profile 响应慢（约 2.9s），
+    // 放进合并命令里会被 send_at_batch 的静默判定提前截断 → IP 丢失。
+    loadCGPADDR();
+
+    // 载波聚合 / 双连接状态（需求3）：判断 CPSI 是否有 NR5G_NSA + LTE 并存
+    updateCAIndicator(lines);
+
+    setStatus(true);
+  } catch (e) {
+    console.error(e);
+    setStatus(false);
+  }
+}
+
+// 需求3：载波聚合状态显示。
+// 依据（SIM82XX 手册）：
+//  - +CPSI 返回两行（LTE + NR5G_NSA）= EN-DC 双连接（NSA 模式，即 4G+5G 载波聚合）
+//  - +CPSI 只有 NR5G_SA = 纯 5G 独立组网
+//  - +CPSI 只有 LTE = 纯 4G，若 +CPSI 含多个 SCell 则为 LTE CA
+//  - +CRSSI 同时返回 LTE 与 NR5G 两行也佐证 EN-DC
+function updateCAIndicator(lines) {
+  const cpsi = lines.filter(l => /^\+CPSI:/.test(l));
+  const hasNR = cpsi.some(l => /^\+CPSI:\s*NR5G/.test(l));
+  const hasLTE = cpsi.some(l => /^\+CPSI:\s*LTE/.test(l));
+  const nrSa = cpsi.some(l => /^\+CPSI:\s*NR5G_SA/.test(l));
+  const nrNsa = cpsi.some(l => /^\+CPSI:\s*NR5G_NSA/.test(l));
+  let text = '未聚合';
+  if (hasNR && hasLTE) {
+    text = nrNsa ? 'EN-DC 双连接 (4G+5G)' : '4G+5G 双连接';
+  } else if (nrSa) {
+    text = '5G 独立组网 (SA)';
+  } else if (hasLTE) {
+    text = '4G 单独 (LTE)';
+  } else if (/^\+CPSI:\s*NO\s+SERVICE/i.test(cpsi[0] || '')) {
+    text = '无服务';
+  }
+  const el = document.getElementById('ca-status');
+  if (el) el.textContent = text;
+}
+
+function setStatus(ok) {
+  const pill = document.getElementById('status-pill');
+  const txt = document.getElementById('status-text');
+  if (ok) {
+    pill.className = 'status-pill online';
+    txt.textContent = '已连接';
+  } else {
+    pill.className = 'status-pill offline';
+    txt.textContent = '未连接';
+  }
+}
+
+/* ==================== 解析函数 ==================== */
+
+function parseCPSI(text) {
+  if (!text || !text.trim()) return;
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.startsWith('+CPSI:'));
+  if (lines.length === 0) return;
+  // 优先解析 NR5G 行，其次 LTE
+  const line = lines.find(l => /^\+CPSI:\s*NR5G/.test(l)) || lines[0];
+  const payload = line.replace(/^\+CPSI:\s*/, '');
+  const parts = payload.split(',');
+  const mode = parts[0];
+
+  const sysModeEl = document.getElementById('sys-mode');
+  const ratLabel = document.getElementById('rat-label');
+  const sSub = document.getElementById('sys-sub');
+
+  // 统一 API：安全取值 + 除以10 + 显示
+  const show = (id, val, unit) => {
+    const v = parseFloat(val);
+    if (isNaN(v)) return;
+    const el = document.getElementById(id);
+    if (el) el.textContent = (v / (unit === 'x1' ? 1 : 10)).toFixed(1) + (unit === 'x1' ? '' : ' ' + unit);
+  };
+  const showInt = (id, val, unit) => {
+    const v = parseFloat(val);
+    if (isNaN(v)) return;
+    const el = document.getElementById(id);
+    if (el) el.textContent = v.toFixed(0) + (unit ? ' ' + unit : '');
+  };
+
+  // ---- 字段定位工具（SA/NSA 索引不同，PLMN 起始位置也不同）----
+  // 单位约定（手册 4.2.12）：
+  //   <RSRP>/<RSRQ>/<RSSI> 为 ×10 上报，需 /10
+  //   <SNR>(NR) 取值 -23~40 即整数 dB、<RSSNR>(LTE) 取值 0~30 整数，二者均**不 /10**
+  const findPlmn = (arr) => {
+    for (let i = 1; i < arr.length; i++) if (/^\d{3}-\d{2,3}/.test(String(arr[i]).replace(/"/g, ''))) return i;
+    return -1;
+  };
+  const bandName = (b) => {
+    if (!b) return '--';
+    const m = String(b).match(/(?:NR5G_BAND|EUTRAN_BAND|BAND)(\d+)/i);
+    if (!m) return b;
+    return /NR5G/i.test(b) ? ('n' + m[1]) : ('B' + m[1]);
+  };
+
+  if (mode.startsWith('NR5G')) {
+    // NR5G_SA ：NR5G_SA,<OpMode>,<MCC-MNC>,<TAC>,<SCellID>,<PCellID>,<FreqBand>,<earfcn>,<RSRP>,<RSRQ>,<SNR>
+    // NR5G_NSA：NR5G_NSA,<PCellID>,<FreqBand>,<earfcn/ssb>,<RSRP>,<RSRQ>,<SNR>,<scs>,<NR_dl_bw>  （无 PLMN）
+    const mi = findPlmn(parts);
+    let o;
+    if (/^NR5G_NSA/i.test(mode)) o = { band: 2, rsrp: 4, rsrq: 5, snr: 6, plmn: -1 };
+    else if (mi >= 0)            o = { band: mi + 4, rsrp: mi + 6, rsrq: mi + 7, snr: mi + 8, plmn: mi };
+    else return;
+
+    const rsrp = parseFloat(parts[o.rsrp]), rsrq = parseFloat(parts[o.rsrq]), snr = parseFloat(parts[o.snr]);
+    if (!isNaN(rsrp)) {
+      const r = rsrp / 10;
+      document.getElementById('rsrp-val').innerHTML = r.toFixed(0) + '<span class="metric-unit">dBm</span>';
+      document.getElementById('detail-rsrp').textContent = r.toFixed(1) + ' dBm';
+      if (lastRsrp !== null) {
+        const diff = r - lastRsrp;
+        const el = document.getElementById('rsrp-trend');
+        el.className = 'metric-trend ' + (diff >= 0 ? 'up' : 'down');
+        el.innerHTML = (diff >= 0 ? '▲' : '▼') + ' ' + Math.abs(diff).toFixed(1) + ' dBm';
+      }
+      lastRsrp = r;
+    }
+    if (!isNaN(rsrq)) document.getElementById('detail-rsrq').textContent = (rsrq / 10).toFixed(1) + ' dB';
+    if (!isNaN(snr)) {
+      document.getElementById('detail-sinr').textContent = snr.toFixed(0) + ' dB';
+      document.getElementById('sinr-num').textContent = snr.toFixed(0);
+      setRing(sinrPct(snr));
+    }
+    if (parts[o.band]) document.getElementById('detail-bw').textContent = bandName(parts[o.band]);
+    if (ratLabel) ratLabel.textContent = 'NR5G';
+    if (sysModeEl) sysModeEl.textContent = mode.replace(/^NR5G_/, '5G ') || '5G';
+    if (sSub) {
+      const carrier = (o.plmn >= 0 ? parts[o.plmn] : bandName(parts[o.band]) || '').replace(/"/g, '');
+      if (carrier) sSub.textContent = carrier;
+    }
+  } else if (mode.startsWith('LTE')) {
+    // LTE：LTE,<OpMode>,<MCC-MNC>,<TAC>,<SCellID>,<PCellID>,<FreqBand>,<earfcn>,<dlbw>,<ulbw>,<RSRQ>,<RSRP>,<RSSI>,<RSSNR>
+    const mi = findPlmn(parts);
+    if (mi < 0) return;
+    const rsrp = parseFloat(parts[mi + 9]), rsrq = parseFloat(parts[mi + 8]), sinr = parseFloat(parts[mi + 11]);
+    if (!isNaN(rsrp)) {
+      const r = rsrp / 10;
+      document.getElementById('rsrp-val').innerHTML = r.toFixed(0) + '<span class="metric-unit">dBm</span>';
+      document.getElementById('detail-rsrp').textContent = r.toFixed(1) + ' dBm';
+    }
+    if (!isNaN(rsrq)) document.getElementById('detail-rsrq').textContent = (rsrq / 10).toFixed(1) + ' dB';
+    if (!isNaN(sinr)) {
+      document.getElementById('detail-sinr').textContent = sinr.toFixed(0) + ' dB';
+      document.getElementById('sinr-num').textContent = sinr.toFixed(0);
+      setRing(sinrPct(sinr));
+    }
+    if (parts[mi + 4]) document.getElementById('detail-bw').textContent = bandName(parts[mi + 4]);
+    if (ratLabel) ratLabel.textContent = 'LTE';
+    if (sysModeEl) sysModeEl.textContent = '4G';
+    if (sSub) {
+      const carrier = (parts[mi] || '').replace(/"/g, '');
+      if (carrier) sSub.textContent = carrier;
+    }
+  }
+}
+
+function parseCRSSI(text) {
+  // +CRSSI:NR5G,-79,-75,-80,-81
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.startsWith('+CRSSI:'));
+  // 优先取 NR5G
+  const nrLine = lines.find(l => l.includes('NR5G')) || lines[0];
+  if (!nrLine) return;
+  const parts = nrLine.replace('+CRSSI:', '').split(',');
+  const rat = parts[0];
+  document.getElementById('ant-rat').textContent = rat;
+  for (let i = 0; i < 4; i++) {
+    const val = parseInt(parts[i + 1]);
+    const el = document.getElementById('ant' + i + '-val');
+    const bar = document.getElementById('ant' + i + '-bar');
+    if (isNaN(val) || val >= 0) {
+      el.textContent = '--';
+      bar.style.height = '0%';
+    } else {
+      el.textContent = val + ' dBm';
+      bar.style.height = signalPct(val) + '%';
+    }
+  }
+  // 主天线也更新到 detail RSSI
+  const prx = parseInt(parts[1]);
+  if (!isNaN(prx) && prx < 0) {
+    document.getElementById('detail-rssi').textContent = prx + ' dBm';
+  }
+}
+
+function parseQMAP(text) {
+  // 注：WWAN 的 IPv4/IPv6 已改由 +CGPADDR 获取（此固件 +CQCMAP="WWAN" 在合并命令里
+  // 响应会丢失，且不回 IPv6）。这里只解析 LANIP 填充「LN IP / 网关」。
+  // ---- LANIP：+CQCMAP:"LANIP",<start>,<end>,<GW>（冒号后可能无空格）----
+  const lanLine = text.split('\n').map(l => l.trim()).find(l => /^\+CQCMAP:\s*"LANIP"/i.test(l));
+  if (lanLine) {
+    const p = lanLine.replace(/^\+CQCMAP:\s*"LANIP",\s*/i, '').split(',');
+    const start = (p[0] || '').replace(/"/g, '').trim();
+    const end = (p[1] || '').replace(/"/g, '').trim();
+    const gw = (p[2] || '').replace(/"/g, '').trim();
+    document.getElementById('net-lan').textContent = gw
+      ? (gw + (start && end ? '（' + start + '~' + end + '）' : ''))
+      : '--';
+  }
+}
+
+// 独立查询 +CGPADDR（拿 WWAN 的 IPv4/IPv6）。该命令遍历 profile 响应慢（约 2.9s），
+// 必须走 send 单命令（不能并进合并命令），否则会被 send_at_batch 的静默判定截断丢响应。
+async function loadCGPADDR() {
+  try {
+    const r = await sendAT('AT+CGPADDR');
+    parseCGPADDR(r);
+  } catch (e) {}
+}
+
+// 解析 IPv6 地址。此固件 +CQCMAP="WWAN" 只回 IPv4 不回 IPv6，需用 +CGPADDR 取。
+// +CGPADDR 返回 <cid>,<IPv4>,<IPv6点分十进制16字节>，取 IPv4 非 0.0.0.0 的活跃行，
+// 把点分十进制 IPv6 转成标准冒号格式（如 36.8.137.98... → 2408:8962:...）。
+function parseCGPADDR(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => /^\+CGPADDR:/i.test(l));
+  for (const line of lines) {
+    const p = line.replace(/^\+CGPADDR:\s*/i, '').split(',');
+    if (p.length < 3) continue;
+    const ipv4 = (p[1] || '').trim();
+    const dotted = (p[2] || '').trim();
+    if (!ipv4 || ipv4 === '0.0.0.0') continue;   // 未拨号的 profile，跳过
+    // 活跃 profile：填 IPv4（此固件 CQCMAP="WWAN" 在合并命令里会丢响应，改用 CGPADDR 取）
+    document.getElementById('net-ip4').textContent = ipv4;
+    // IPv6
+    const b = dotted.split('.').map(Number);
+    if (b.length === 16 && b.some(x => x > 0)) {
+      const g = [];
+      for (let i = 0; i < 16; i += 2) g.push(((b[i] << 8) | b[i + 1]).toString(16));
+      document.getElementById('net-ip6').textContent = g.join(':');
+      return;
+    }
+    // 活跃 profile 但 IPv6 全 0 → 当前连接只有 IPv4
+    document.getElementById('net-ip6').textContent = '未分配';
+    return;
+  }
+  // 无活跃 profile（未拨号）
+  document.getElementById('net-ip4').textContent = '未连接';
+  document.getElementById('net-ip6').textContent = '未分配';
+}
+
+// 设备静态信息：走 /cgi-bin/deviceinfo（后端已缓存到内存），不再走 AT 串口。
+async function loadDeviceInfo() {
+  try {
+    const r = await fetch('/cgi-bin/deviceinfo');
+    const t = await r.text();
+    const kv = {};
+    t.split('\n').forEach(l => { const m = l.match(/^([A-Z]+)=(.*)$/); if (m) kv[m[1]] = m[2].trim(); });
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v || '--'); };
+    set('dev-manu', kv.MANU);
+    set('dev-model', kv.MODEL);
+    set('dev-firm', kv.FIRM);
+    set('dev-imei', kv.IMEI);
+    set('dev-imsi', kv.IMSI);
+    set('dev-iccid', kv.ICCID);
+  } catch (e) {
+    // 失败时保持 '--'，不影响主刷新
+  }
+}
+
+function parseReg(text) {
+  // +CEREG: 2,1,...   +C5GREG: 2,1,...
+  const m5g = text.match(/\+C5GREG:\s*\d+,(\d+)/);
+  const mlte = text.match(/\+CEREG:\s*\d+,(\d+)/);
+  const reg5g = m5g ? parseInt(m5g[1]) : null;
+  const regLte = mlte ? parseInt(mlte[1]) : null;
+  const reg = reg5g !== null ? reg5g : regLte;
+  const map = { 0:'未注册', 1:'已注册(本地)', 2:'搜索中', 3:'被拒绝', 4:'未知', 5:'已注册(漫游)' };
+  document.getElementById('net-reg').textContent = map[reg] || ('状态 ' + reg);
+}
+
+function parseNetInfo(text) {
+  // 手册 4.2.17 AT+CNWINFO?，需先用 AT+CNWINFO=1 开启上下行流上报。
+  // 真机实测（SIM8260）字段顺序与手册略有出入：DL_MOD 被拆成「数字代号 + 文字」两个字段，
+  // 故用调制文字正则智能判断偏移，兼容旧/新固件两种返回格式。
+  //  NR5G 真机(开启后): NR5G,NCGI,gNBID,DL_MCS,UL_MCS,DL_Layers,DL_MOD_num,DL_MOD_text,UL_MOD_text,CQI,BW,TX,RSSI,QCI
+  //  LTE(手册)        : LTE,ECGI,eNBID,MCS,DL_Layers,DL_MOD,UL_MOD,CQI,TRANS_MODE,TX_POWER
+  const MOD_RE = /^(QPSK|16QAM|64QAM|256QAM|1024QAM|BPSK|PI\/?2?-?BPSK|UNKOWN|NONE)$/i;
+  const card = document.getElementById('dl-rate-card');
+  const line = text.split('\n').map(l => l.trim()).find(l => /^\+CNWINFO:/i.test(l));
+  // 无 CNWINFO 数据 → 隐藏整个卡片（需求：无数据则删除）
+  if (!line) {
+    if (card) card.style.display = 'none';
+    return;
+  }
+  const payload = line.replace(/^\+CNWINFO:\s*/i, '');
+  const parts = payload.split(',');
+  const rat = (parts[0] || '').trim().toUpperCase();
+  if (card) card.style.display = '';
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const setHTML = (id, v) => { const el = document.getElementById(id); if (el) el.innerHTML = v; };
+
+  if (rat === 'NR5G') {
+    // DL_MCS=parts[3], UL_MCS=parts[4], DL_Layers=parts[5]
+    const dlLayers = parts[5] || '--';
+    const dlMcs = parts[3] || '--';
+    // parts[6] 是调制文字 → 单字段格式(off=0)；否则 parts[6] 是数字代号，文字调制在 parts[7](off=1)
+    const off = MOD_RE.test((parts[6] || '').trim()) ? 0 : 1;
+    const dlMod = parts[6 + off] || '--';   // 下行调制文字
+    const ulMod = parts[7 + off] || '--';   // 上行调制文字
+    const cqi   = parts[8 + off] || '--';
+    const bw    = parts[9 + off] || '--';
+    const tx    = parts[10 + off] || '--';
+    setHTML('dl-layers', dlLayers + '<span class="metric-unit">流</span>');
+    setEl('dl-modul', '下行调制: ' + dlMod + (ulMod !== '--' ? ' · 上行 ' + ulMod : ''));
+    setEl('mcs-info', 'MCS: ' + dlMcs + ' · CQI: ' + cqi);
+    setEl('net-txpwr', tx + ' dBm');
+    if (bw && bw !== '--') setEl('detail-bw', bw);
+  } else if (rat === 'LTE') {
+    // LTE: LTE,ECGI,eNBID,MCS,DL_Layers,DL_MOD,UL_MOD,CQI,TRANS_MODE,TX_POWER
+    // 同样用调制文字判断 parts[5] 是否调制文字，兼容双字段格式
+    const off = MOD_RE.test((parts[5] || '').trim()) ? 0 : 1;
+    setHTML('dl-layers', (parts[4] || '--') + '<span class="metric-unit">流</span>');
+    setEl('dl-modul', '下行调制: ' + (parts[5 + off] || '--') + (parts[6 + off] ? ' · 上行 ' + parts[6 + off] : ''));
+    setEl('mcs-info', 'MCS: ' + (parts[3] || '--') + ' · CQI: ' + (parts[7 + off] || '--'));
+    setEl('net-txpwr', (parts[8 + off] || parts[9] || '--') + ' dBm');
+  }
+}
+
+function parseAPN(text) {
+  // +CGDCONT: 1,"IP","ctnet",...
+  const line = text.split('\n').map(l => l.trim()).find(l => /^\+CGDCONT:\s*1,/i.test(l));
+  if (line) {
+    const parts = line.replace(/^\+CGDCONT:\s*1,\s*/i, '').split(',');
+    // cid,PDP_type,APN → parts[1]=PDP_type, parts[2]=APN
+    if (parts[1]) document.getElementById('net-apn').textContent = parts[1].replace(/"/g, '');
+  }
+}
+
+/* ==================== 初始化 ==================== */
+
+document.addEventListener('DOMContentLoaded', () => {
+  refreshAll();
+  // 注册给右上角「自动刷新」开关（默认关闭）
+  window.__pageRefresh = refreshAll;
+});
+</script>
+</body>
+</html>

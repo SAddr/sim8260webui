@@ -1,0 +1,172 @@
+#!/bin/sh
+# =====================================================================
+# Simcom WebUI - Linux 终端 CGI（受限只读 shell）
+#
+# 提供网页版 Linux 命令执行（参考面板的「Linux 终端」Tab）。
+# 安全策略（重要）：
+#   - 只允许「只读/查询」类命令（白名单前缀），拒绝一切写/删/重启/提权命令。
+#   - 拒绝命令拼接（; && | 管道 反引号 $() 重定向 > >> 等），防止绕过。
+#   - 超时 5 秒强制终止，防止卡死占住 lighttpd 进程。
+#
+# 用法：GET /cgi-bin/shell?cmd=free%20-m
+# =====================================================================
+
+# ---------- URL 解码（与 libat.sh 同款，避免把 + 当空格） ----------
+urldecode() {
+    printf '%b' "$(printf '%s' "$1" | sed 's/%\(..\)/\\x\1/g')"
+}
+
+# ---------- 运行时目录（内存 fs，见仓库根目录 at-runenv.sh） ----------
+# 本 CGI 会把命令输出写进临时文件；落点必须在内存上，否则每敲一条
+# 命令就写一次 NAND。
+_SIMCOM_RUNENV="$(dirname "$0")/../at-runenv.sh"
+if [ -f "$_SIMCOM_RUNENV" ]; then
+    . "$_SIMCOM_RUNENV"
+else
+    AT_TMP_DIR=/tmp/simcom-webui/tmp
+    AT_RUN_IS_RAM=0
+    mkdir -p "$AT_TMP_DIR" 2>/dev/null
+    TMPDIR="$AT_TMP_DIR"; export TMPDIR
+fi
+
+CMD=""
+if [ -n "$QUERY_STRING" ]; then
+    OLD_IFS="$IFS"; IFS='&'; set -f
+    for pair in $QUERY_STRING; do
+        key=$(echo "$pair" | cut -d= -f1)
+        val=$(echo "$pair" | cut -d= -f2-)
+        if [ "$key" = "cmd" ]; then
+            CMD=$(urldecode "$val")
+            break
+        fi
+    done
+    IFS="$OLD_IFS"; set +f
+fi
+
+echo "Content-Type: text/plain; charset=utf-8"
+echo "Cache-Control: no-store"
+echo ""
+
+if [ -z "$CMD" ]; then
+    echo "Usage: /cgi-bin/shell?cmd=ls"
+    exit 0
+fi
+
+# ---------- 危险命令/模式黑名单（绝对拒绝） ----------
+# 写文件、删文件、格式化、重启、杀进程、提权、命令拼接、重定向、子 shell 等一律拒绝。
+#
+# 为什么黑名单要写成 `\b` 词首锚定：原来是裸子串匹配（'rm' 不带边界），
+# 既会误杀（`cat /proc/arm` 含 "rm" 被拒），又给人"很严"的错觉。改成锚定后
+# 语义才是"这条命令的第一个词/某个词就是这个危险命令"。
+#
+# 为什么必须补上 wget/curl/nc/tee/truncate/mknod 这些：
+#   重定向（> >>）已经被禁，但「applet 自带的输出文件参数」是另一条写文件的路：
+#   `wget -O /userdata/x http://...`、`curl -o /userdata/x ...` 都能直接往 NAND
+#   上写东西，而且 cmdline 里一个 `>` 都没有，老黑名单拦不住。
+#
+# 为什么把 busybox 从白名单里去掉：
+#   `busybox <任意 applet>` 等于白名单的一个万能后门（`busybox rm ...` 只靠
+#   rm 那条子串规则偶然拦住，换个 applet 就绕过了）。直接调 applet 一样能用，
+#   所以不给它开口子。
+if echo "$CMD" | grep -qE '(^|[^[:alnum:]_-])(rm|rmdir|unlink|mkfs|fdisk|format|erase|dd|reboot|poweroff|shutdown|halt|kill|killall|pkill|chmod|chown|chgrp|mv|cp|ln|mount|umount|swapon|swapoff|insmod|rmmod|modprobe|flash|mtd|nv|eval|exec|su|sudo|passwd|wget|curl|nc|netcat|telnet|ftp|scp|sftp|tftp|truncate|mknod|mkfifo|tee|install|xargs|sysctl|setprop|vi|vim|nano|ed|sh|ash|bash|csh|env|nice|nohup|setsid|script)([^[:alnum:]_-]|$)'; then
+    echo "ERROR: 命令包含危险操作或被禁止的符号，已拒绝。"
+    echo "本终端仅支持只读/查询命令（ls/free/df/cat/ps/ip/dmesg 等）。"
+    exit 0
+fi
+# 重定向 / 命令拼接 / 子 shell —— 这些字符本身一律拒绝
+# （反斜杠不在此列：它本身不能拼接命令，而 grep '\bxxx' 这类只读用法需要它）
+case "$CMD" in
+    *'>'*|*'<'*|*';'*|*'&&'*|*'||'*|*'|'*|*'`'*|*'$('*|*'${'*|*'&'*)
+        echo "ERROR: 命令包含被禁止的符号（重定向/管道/拼接/子 shell）。"
+        echo "本终端仅支持单条只读命令。"
+        exit 0
+        ;;
+esac
+# 换行同样必须拒绝：urldecode 会把 %0A 还原成真正的换行，而
+# `sh -c "cmd1\ncmd2"` 会依次执行两条命令，等于绕过了"单条命令"的限制
+# （grep 黑名单是按行匹配的，也拦不住这种组合）。
+if [ "$(printf '%s' "$CMD" | tr -d '\n\r')" != "$CMD" ]; then
+    echo "ERROR: 命令包含换行，已拒绝。"
+    exit 0
+fi
+
+# find 的动作参数是另一条"写/删"的通道：上面的黑名单是按「词」锚定的，
+# `-delete` 前面是个 `-`（属于 [^[:alnum:]_-] 之外被排除的字符），匹配不到
+# "delete" 规则；重定向检查也拦不住它。`find /userdata -delete` 能直接删文件，
+# `-fprint/-fprintf/-fls` 能直接写文件 → 一律拒绝。
+case "$CMD" in
+    *'-delete'*|*'-fprint'*|*'-fprintf'*|*'-fls'*|*'-exec'*|*'-execdir'*|*'-ok'*)
+        echo "ERROR: find 的写/删类动作（-delete/-exec/-fprint 等）已被拒绝。"
+        echo "本终端仅支持只读查询。"
+        exit 0
+        ;;
+esac
+
+# 敏感文件：cat/head/tail/grep 这类「首词在白名单」的只读命令其实等于
+# "读任意文件"。这里把凭据类文件挡掉（.htpasswd 的哈希可被离线爆破、
+# shadow/pem 同理）。端口/面板凭据不应出现在网页终端的输出里。
+case "$CMD" in
+    *'.htpasswd'*|*'/etc/shadow'*|*'.pem'*|*'/etc/passwd'*)
+        echo "ERROR: 拒绝访问凭据类敏感文件。"
+        exit 0
+        ;;
+esac
+
+# ---------- 白名单前缀 ----------
+# 取命令第一个词（剥离前导空格），必须在白名单内，或是对 /proc /sys 等的读取
+FIRST=$(echo "$CMD" | sed 's/^[[:space:]]*//' | cut -d' ' -f1)
+case "$FIRST" in
+    ls|dir|free|df|cat|more|less|ps|top|uname|date|uptime|ifconfig|ip|route|netstat|ss|dmesg|tail|head|grep|wc|find|du|pwd|echo|hostname|id|whoami|nslookup|ping|arp|getprop|logcat|lsmod|which|readlink|stat|basename|dirname)
+        ;;
+    *)
+        # 允许直接读取 /proc /sys /tmp 及运行时目录下的文件（cat/head/tail/ls）
+        case "$CMD" in
+            /proc/*|/sys/*|/tmp/*|/run/*|/dev/shm/*|cat\ /proc/*|cat\ /sys/*|head\ /proc/*|tail\ /proc/*|ls\ /proc*|ls\ /sys*)
+                ;;
+            *)
+                echo "ERROR: 命令 '$FIRST' 不在允许列表内。"
+                echo "允许：ls free df cat ps top uname date ifconfig ip dmesg grep find du 等只读命令。"
+                exit 0
+                ;;
+        esac
+        ;;
+esac
+
+# ---------- 执行（超时 5 秒） ----------
+OUT=$(mktemp 2>/dev/null) || OUT="$AT_TMP_DIR/shell_$$.out"
+cd / 2>/dev/null
+
+# 超时必须连子进程一起杀。
+#   `sh -c "ping 1.1.1.1"` 里 ping 是 sh 的子进程；只 kill sh 的话 ping 会活下来，
+#   并继续持有 $OUT 的写端 → 后面的 cat "$OUT" 永远等不到 EOF，CGI 挂死不返回，
+#   一直占着 lighttpd 的 CGI worker（反复触发会拖垮整个面板）。
+#   这里用 /proc 反查 PPid 杀整棵子树，不依赖 setsid/pkill 的可用性和负 pid 语义。
+_kill_tree() {
+    _kp="$1"
+    for _cd in /proc/[0-9]*; do
+        [ -r "$_cd/status" ] || continue
+        _cp=$(awk '/^PPid:/{print $2; exit}' "$_cd/status" 2>/dev/null)
+        [ "$_cp" = "$_kp" ] && kill -9 "${_cd#/proc/}" 2>/dev/null
+    done
+    kill -9 "$_kp" 2>/dev/null
+    return 0
+}
+
+sh -c "$CMD" > "$OUT" 2>&1 &
+PID=$!
+i=0
+while [ $i -lt 50 ]; do
+    kill -0 "$PID" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+done
+# 超时则终止整棵子树并提示
+if kill -0 "$PID" 2>/dev/null; then
+    _kill_tree "$PID"
+    sleep 0.2          # 让被杀的进程把已写出的内容刷完
+    echo "[已超时终止（5s）]"
+fi
+cat "$OUT" 2>/dev/null
+rm -f "$OUT"
+
+exit 0

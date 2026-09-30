@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>设置 · SIM8260</title>
+  <script src="js/wb-theme.js"></script>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-title">SIM8260 Control Center</div>
+      <div class="brand-subtitle">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <a href="index.html" class="nav-tab">总览</a>
+    <a href="signal.html" class="nav-tab">信号</a>
+    <a href="network.html" class="nav-tab">网络</a>
+    <a href="device.html" class="nav-tab">设备</a>
+    <a href="sms.html" class="nav-tab">短信</a>
+    <a href="atcmd.html" class="nav-tab">AT 命令</a>
+    <a href="settings.html" class="nav-tab active">设置</a>
+  </nav>
+  <div class="topbar-foot"><span class="status-pill online"><span class="status-dot"></span>已连接</span></div>
+</header>
+
+<main class="container">
+  <div>
+    <h1 class="page-title">设置</h1>
+    <p class="page-subtitle">USB 网卡形态、自动拨号等高级配置</p>
+  </div>
+
+  <!-- USB 配置 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🔌</span> USB 网卡形态</div>
+    </div>
+    <table class="info-table">
+      <tr><td>当前 VID:PID</td><td id="usb-pid">--</td></tr>
+      <tr><td>USB 速率</td><td id="usb-speed">--</td></tr>
+      <tr><td>ADB 状态</td><td id="usb-adb">--</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">USB PID (composite)</label>
+        <select class="select" id="pid-select" style="width:300px;">
+          <option value="9001">9001 - NDIS/QMI · 出厂默认，高通QMI，高速率/QMAP</option>
+          <option value="9011">9011 - RNDIS/ECM · 免驱，需 AT+NETACT 开链路</option>
+          <option value="901E">901E - MBIM · Win8/10/11 自带，枚举 WWAN 网卡</option>
+          <option value="9003">9003 - MBIM(另一组合) · Linux cdc_mbim</option>
+          <option value="902B">902B - RNDIS+UAC · 带 USB 声卡</option>
+          <option value="9B2A">9B2A - 诊断/下载模式 · 工厂烧录/EDL</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">ADB</label>
+        <select class="select" id="adb-select" style="width:120px;">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="applyUSB()">应用 USB 配置</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      ⚠️ 切换 USB PID 后模块会重新枚举 USB 设备，网页会短暂断开。MBIM 模式取决于 PID + 驱动的组合，需安装 Windows 驱动后由系统枚举。
+    </div>
+    <div style="overflow-x:auto;margin-top:14px;">
+      <table style="width:100%;font-size:12px;border-collapse:collapse;min-width:620px;">
+        <thead>
+          <tr style="color:var(--accent-primary);text-align:left;">
+            <th style="padding:7px 8px;border-bottom:1px solid var(--border-color);">PID</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--border-color);">网卡类型</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--border-color);">接口组合</th>
+            <th style="padding:7px 8px;border-bottom:1px solid var(--border-color);">特点 / Linux 节点</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">9001</td><td style="padding:6px 8px;">NDIS/QMI</td><td style="padding:6px 8px;">AT+Modem+NMEA+DIAG+QMI/NDIS</td><td style="padding:6px 8px;color:var(--text-muted);">出厂默认，速度快、支持 QMAP，Win 需 Simcom 驱动 · wwan0/qmiwwan0 + ttyUSB0~3</td></tr>
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">9011</td><td style="padding:6px 8px;">RNDIS/ECM</td><td style="padding:6px 8px;">AT+Modem+NMEA+DIAG+RNDIS</td><td style="padding:6px 8px;color:var(--text-muted);">免驱即插即用，默认需 AT+NETACT=1 开链路 · usb0</td></tr>
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">901E</td><td style="padding:6px 8px;">MBIM</td><td style="padding:6px 8px;">AT+Modem+NMEA+MBIM</td><td style="padding:6px 8px;color:var(--text-muted);">Win8/10/11 自带 MBIM 驱动，枚举 WWAN，可直接拨号；Linux 需 3.18+ · wwan0(MBIM)</td></tr>
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">9003</td><td style="padding:6px 8px;">MBIM(另一)</td><td style="padding:6px 8px;">AT+Modem+NMEA+MBIM</td><td style="padding:6px 8px;color:var(--text-muted);">接口组合略异，不同固件默认值可能不同 · Linux cdc_mbim · wwan0+若干 ttyUSB</td></tr>
+          <tr><td style="padding:6px 8px;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">902B</td><td style="padding:6px 8px;">RNDIS+UAC</td><td style="padding:6px 8px;">AT+Modem+NMEA+DIAG+RNDIS+UAC 音频</td><td style="padding:6px 8px;color:var(--text-muted);">多枚举一个 USB 声卡，可语音通话/采集 · usb0 + snd_usb_audio</td></tr>
+          <tr><td style="padding:6px 8px;color:var(--text-secondary);">9B2A</td><td style="padding:6px 8px;">总线/诊断</td><td style="padding:6px 8px;">诊断/下载模式</td><td style="padding:6px 8px;color:var(--text-muted);">较少用，工厂烧录/紧急下载(EDL/9008)或诊断 · 不枚举常规网卡</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SIM 卡切换 -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">💳</span> SIM 卡切换 (SMSIMCFG)</div>
+      <span class="status-pill" id="sim-pill"><span class="status-dot"></span><span id="sim-status">检查中</span></span>
+    </div>
+    <table class="info-table">
+      <tr><td>工作模式</td><td id="sim-mode">--</td></tr>
+      <tr><td>当前 SIM 槽</td><td id="sim-slot">--</td></tr>
+      <tr><td>槽 1 状态</td><td id="sim-stat1">--</td></tr>
+      <tr><td>槽 2 状态</td><td id="sim-stat2">--</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">切换到 SIM 槽</label>
+        <select class="select" id="sim-slot-select" style="width:120px;">
+          <option value="1">SIM 槽 1</option>
+          <option value="2">SIM 槽 2</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">模式</label>
+        <select class="select" id="sim-mode-select" style="width:120px;">
+          <option value="0">SSSA (单卡单待)</option>
+          <option value="1">DSSA (双卡单待)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="switchSim()">切换 SIM</button>
+      <button class="btn" onclick="loadSim()">刷新</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      ⚠️ 切换 <strong>立即生效</strong>，仅一个槽可被激活。切换成功后模块返回 <code>+SMSIMCFG: &lt;mode&gt;,&lt;slot&gt;</code>；
+      若有其它 SIM 操作正在进行则不允许切换。8300G 5G 模块及 DSDS/DSDA 平台不支持本命令。
+    </div>
+  </div>
+
+  <!-- 自动拨号 -->
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🔄</span> QCMAP 自动拨号</div>
+    </div>
+    <table class="info-table">
+      <tr><td>规则 0 自动拨号</td><td id="auto-0">--</td></tr>
+      <tr><td>规则 1 自动拨号</td><td id="auto-1">--</td></tr>
+      <tr><td>规则 2 自动拨号</td><td id="auto-2">--</td></tr>
+      <tr><td>规则 3 自动拨号</td><td id="auto-3">--</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">规则</label>
+        <select class="select" id="rule-select" style="width:90px;">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">自动拨号</label>
+        <select class="select" id="auto-select" style="width:100px;">
+          <option value="1">开启</option>
+          <option value="0">关闭</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">Profile ID</label>
+        <input type="number" class="input" id="profile-input" value="1" style="width:90px;" />
+      </div>
+      <button class="btn btn-primary" onclick="applyAutoDial()">应用</button>
+    </div>
+  </div>
+
+  <!-- 修改 IMEI -->
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🆔</span> 修改 IMEI</div>
+    </div>
+    <table class="info-table">
+      <tr><td>当前 IMEI</td><td id="imei-cur">--</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
+        <label style="font-size:12px;color:var(--text-secondary);">新 IMEI（15 位数字）</label>
+        <input type="text" class="input" id="imei-input" placeholder="例如 864680060000480" maxlength="15" />
+      </div>
+      <button class="btn btn-danger" onclick="setIMEI()">写入</button>
+      <button class="btn" onclick="loadIMEI()">刷新</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      ⚠️ <strong>修改 IMEI 属敏感操作，请确保符合当地法规与运营商要求。</strong>
+      命令 <code>AT+SIMEI=&lt;imei&gt;</code>（15 位数字，不带引号），修改后需重启模块生效。
+    </div>
+  </div>
+
+  <!-- SFE 软件加速 -->
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">⚡</span> SFE 软件加速</div>
+    </div>
+    <table class="info-table">
+      <tr><td>当前状态</td><td id="sfe-status">--</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+      <select class="select" id="sfe-select" style="width:160px;">
+        <option value="enable">enable - 开启</option>
+        <option value="disable">disable - 关闭</option>
+      </select>
+      <button class="btn btn-primary" onclick="setSFE()">应用</button>
+      <button class="btn" onclick="loadSFE()">刷新</button>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      ⓘ SFE 仅在模块不支持硬件加速(IPA)时提供有限优化；若模块支持 IPA，则该功能不可用。
+    </div>
+  </div>
+
+  <!-- 登录安全 -->
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🔐</span> 登录与密码</div>
+      <span class="status-pill online" id="auth-pill">...
+        <span id="auth-status">检查中</span>
+      </span>
+    </div>
+    <table class="info-table">
+      <tr><td>登录认证</td><td id="auth-mode">--</td></tr>
+      <tr><td>默认用户名</td><td>admin</td></tr>
+      <tr><td>认证类型</td><td>HTTP Basic (lighttpd mod_auth)</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">当前密码</label>
+        <input type="password" class="input" id="pw-old" placeholder="当前密码" autocomplete="current-password" />
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">新密码</label>
+        <input type="password" class="input" id="pw-new" placeholder="至少 6 位" autocomplete="new-password" />
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-secondary);">确认新密码</label>
+        <input type="password" class="input" id="pw-confirm" placeholder="再次输入" autocomplete="new-password" />
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="changePwd()">修改密码</button>
+      <button class="btn" id="btn-reset" onclick="setDefaultPwd()">重置为默认 (admin/admin)</button>
+      <span id="pw-status" style="font-size:13px;"></span>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      ⚠️ 修改密码只会影响 WebUI 登录认证（.htpasswd），不会改变模块本身。请牢记新密码。
+      <br>「重置为默认」仅在认证未启用（首次初始化）时可用；已启用后如需恢复，请通过 ADB shell 删除 .htpasswd 文件。
+    </div>
+  </div>
+
+  <!-- 关于 -->
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">ℹ️</span> 关于</div>
+    </div>
+    <table class="info-table">
+      <tr><td>WebUI 版本</td><td>v1.0.6 (for SIM8260 / SDX62)</td></tr>
+      <tr><td>架构参考</td><td>quectel-rgmii-toolkit-cn (SDXLEMUR)</td></tr>
+      <tr><td>技术栈</td><td>lighttpd + CGI/shell + 静态前端 (Alpine.js / Vanilla)</td></tr>
+      <tr><td>部署路径</td><td>/userdata/simcom-webui/</td></tr>
+    </table>
+  </div>
+
+  <div class="footer">Powered by @Valor</div>
+</main>
+
+<script>
+async function sendAT(cmd) {
+  const r = await fetch('/cgi-bin/atcmd?cmd=' + encodeURIComponent(cmd));
+  return await r.text();
+}
+
+async function loadUSB() {
+  // 合并成一条批量命令：一次串口往返拿回整体配置 + USBMODE 子项。
+  const all = await sendAT('AT+CUSBCFG?;+CUSBCFG=USBMODE');
+  const cfg = all, mode = all;
+  // 解析 CUSBCFG
+  const adbM = cfg.match(/USBADB:\s*(\d+)/);
+  const pidM = cfg.match(/USBID:\s*(0X)?([0-9A-F]+),(0X)?([0-9A-F]+)/i);
+  if (adbM) {
+    const adbOn = adbM[1] === '1';
+    document.getElementById('usb-adb').textContent = adbOn ? '已开启' : '已关闭';
+    document.getElementById('adb-select').value = adbOn ? '1' : '0';
+  }
+  if (pidM) {
+    const pid = pidM[4] || pidM[2];
+    document.getElementById('usb-pid').textContent = '1E0E:' + pid.toUpperCase();
+    document.getElementById('pid-select').value = pid.toLowerCase();
+  }
+  const speedM = mode.match(/USBMODE:\s*(.+)/i);
+  if (speedM) document.getElementById('usb-speed').textContent = speedM[1].trim();
+}
+
+async function applyUSB() {
+  const pid = document.getElementById('pid-select').value;
+  const adb = document.getElementById('adb-select').value;
+  if (!confirm('将修改 USB PID 为 ' + pid + ' 并设置 ADB=' + adb + '\n切换后 USB 设备会重新枚举，网页可能断开。确定吗？')) return;
+  await sendAT('AT+CUSBCFG=usbadb,' + adb);
+  const r = await sendAT('AT+CUSBCFG=usbid,1e0e,' + pid);
+  alert('指令已发送：\n' + r + '\n\n设备将重新枚举 USB，请稍后刷新页面。');
+}
+
+async function loadSim() {
+  // 加载态
+  ['sim-mode','sim-slot','sim-stat1','sim-stat2'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>';
+  });
+  const pill = document.getElementById('sim-pill');
+  const txt = document.getElementById('sim-status');
+  if (pill) pill.className = 'status-pill';
+  if (txt) txt.textContent = '加载中…';
+  // 手册 3.2.22 AT+SMSIMCFG?：
+  //  SSSA: +SMSIMCFG: <mode>,<slot>,<stat>
+  //  DSSA: +SMSIMCFG: <mode>,<slot>,<stat>  (两行，每槽一行)
+  const r = await sendAT('AT+SMSIMCFG?');
+  const lines = r.split('\n').map(l=>l.replace(/\r$/,'').trim())
+                    .filter(l => /^\+SMSIMCFG:/.test(l));
+  const statMap = { '0':'未插入', '1':'已插入并激活', '2':'已插入未激活', '3':'SIM 错误' };
+  const modeMap = { '0':'SSSA（单卡单待）', '1':'DSSA（双卡单待）' };
+  let mode = '--', curSlot = '--', s1 = '--', s2 = '--';
+  for (const line of lines) {
+    const m = line.replace(/^\+SMSIMCFG:\s*/, '').split(',');
+    const mo = m[0], slot = m[1], stat = m[2];
+    mode = mo;
+    if (slot === '1') s1 = statMap[stat] || stat;
+    if (slot === '2') s2 = statMap[stat] || stat;
+    if (stat === '1') curSlot = 'SIM 槽 ' + slot;   // 激活的槽
+  }
+  document.getElementById('sim-mode').textContent = modeMap[mode] || mode || '--';
+  document.getElementById('sim-slot').textContent = curSlot;
+  document.getElementById('sim-stat1').textContent = s1;
+  document.getElementById('sim-stat2').textContent = s2;
+  // 确定当前激活槽以回填下拉
+  const cur = lines.length ? (lines.find(l=>l.includes(',1,1')) || lines[0]).match(/,(\d+),\d+/)[1] : null;
+  if (cur) document.getElementById('sim-slot-select').value = cur;
+  if (mode === '0' || mode === '1') document.getElementById('sim-mode-select').value = mode;
+  if (curSlot !== '--') { pill.className = 'status-pill online'; txt.textContent = curSlot.replace('SIM 槽 ','SIM'); }
+  else { pill.className = 'status-pill offline'; txt.textContent = '无激活 SIM'; }
+}
+
+async function switchSim() {
+  const slot = document.getElementById('sim-slot-select').value;
+  const mode = document.getElementById('sim-mode-select').value;
+  if (!confirm('确定切换到 SIM 槽 ' + slot + '（模式 ' + (mode==='0'?'SSSA':'DSSA') + '）？\n切换立即生效，仅一个槽激活，可能短暂脱网。')) return;
+  const r = await sendAT('AT+SMSIMCFG=' + mode + ',' + slot);
+  const ok = /OK/i.test(r) && !/^ERROR/i.test(r);
+  alert(ok ? 'SIM 切换指令已受理：\n' + r + '\n\n切换成功后模块会返回 +SMSIMCFG: <mode>,<slot>。' : '切换指令返回异常：\n' + r);
+  setTimeout(loadSim, 1500);
+}
+
+async function loadAutoDial() {
+  const t = await sendAT('AT+CQCMAP="auto_connect"');
+  // 实际返回 +CQCMAP: "auto_connect",<n>,<on>,<profileID>（冒号后有空格），
+  // 旧代码用 '+CQCMAP:"auto_connect"'（无空格）匹配不到 → 全空。用 \s* 兼容。
+  const lines = t.split('\n').map(l=>l.trim()).filter(l => /^\+CQCMAP:\s*"auto_connect"/i.test(l));
+  for (const line of lines) {
+    const parts = line.replace(/^\+CQCMAP:\s*"auto_connect",\s*/i, '').split(',');
+    const n = parseInt(parts[0]);
+    const on = parseInt(parts[1]);
+    const el = document.getElementById('auto-' + n);
+    if (el) el.textContent = (on === 1 ? '✅ 开启 (Profile ' + parts[2] + ')' : '❌ 关闭');
+  }
+}
+
+async function applyAutoDial() {
+  const rule = document.getElementById('rule-select').value;
+  const auto = document.getElementById('auto-select').value;
+  const pid = document.getElementById('profile-input').value;
+  const r = await sendAT('AT+CQCMAP="auto_connect",' + rule + ',' + auto + ',' + pid);
+  alert('指令已发送：\n' + r);
+  loadAutoDial();
+}
+
+/* ============ 修改 IMEI ============ */
+async function loadIMEI() {
+  const el = document.getElementById('imei-cur');
+  el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>';
+  const r = await sendAT('AT+CGSN');
+  // 仅取纯数字行（15 位 IMEI）；部分固件返回 +CME ERROR: memory failure 时不显示错误文本
+  const lines = r.split('\n').map(l=>l.replace(/\r$/,'').trim()).filter(l => /^\d{10,}$/.test(l));
+  el.textContent = lines[0] || '--';
+}
+async function setIMEI() {
+  const imei = document.getElementById('imei-input').value.trim();
+  if (!/^\d{15}$/.test(imei)) { alert('请输入 15 位数字 IMEI'); return; }
+  if (!confirm('确定写入新 IMEI ' + imei + '？\n⚠️ 修改 IMEI 可能违反当地法规，请确认合规。\n写入后需重启模块生效。')) return;
+  const r = await sendAT('AT+SIMEI=' + imei);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? 'IMEI 写入指令已受理（重启后生效）：\n' + r : '写入失败：\n' + r);
+  loadIMEI();
+}
+
+/* ============ SFE 软件加速 ============ */
+async function loadSFE() {
+  const el = document.getElementById('sfe-status');
+  el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>';
+  const r = await sendAT('AT+CQCMAP="SFE"');
+  const m = r.match(/\+CQCMAP:\s*"SFE",\s*"?(enable|disable)"?/i);
+  if (m) {
+    el.textContent = m[1] === 'enable' ? '已开启 (enable)' : '已关闭 (disable)';
+    document.getElementById('sfe-select').value = m[1];
+  } else {
+    el.textContent = '不支持或未返回（可能支持 IPA 硬件加速）';
+  }
+}
+async function setSFE() {
+  const v = document.getElementById('sfe-select').value;
+  const r = await sendAT('AT+CQCMAP="SFE","' + v + '"');
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? 'SFE 已设置为 ' + v + '：\n' + r : '设置失败（模块可能支持 IPA 硬件加速，SFE 不可用）：\n' + r);
+  loadSFE();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadUSB();
+  loadAutoDial();
+  loadSim();
+  loadAuthStatus();
+  loadIMEI();
+  loadSFE();
+  window.__pageRefresh = () => { loadUSB(); loadSim(); loadAuthStatus(); loadSFE(); };
+});
+
+/* ============ 登录认证 / 修改密码 ============ */
+async function loadAuthStatus() {
+  try {
+    const r = await fetch('/cgi-bin/password?action=status');
+    const t = await r.text();
+    const pill = document.getElementById('auth-pill');
+    const st = document.getElementById('auth-status');
+    const mode = document.getElementById('auth-mode');
+    if (t.includes('AUTH:ENABLED')) {
+      pill.className = 'status-pill online';
+      st.textContent = '已启用';
+      mode.textContent = 'HTTPS + Basic 认证';
+      // 已启用认证时禁用匿名重置按钮（后端也拒绝）
+      const btnReset = document.getElementById('btn-reset');
+      if (btnReset) {
+        btnReset.disabled = true;
+        btnReset.style.opacity = '0.45';
+        btnReset.style.cursor = 'not-allowed';
+        btnReset.title = '认证已启用，需通过 ADB shell 删除 .htpasswd 才能重置';
+      }
+    } else {
+      pill.className = 'status-pill offline';
+      st.textContent = '未启用';
+      mode.textContent = '无认证（首次访问会提示设置）';
+    }
+  } catch (e) {
+    document.getElementById('auth-status').textContent = '未知';
+  }
+}
+
+async function changePwd() {
+  const oldPw = document.getElementById('pw-old').value;
+  const newPw = document.getElementById('pw-new').value;
+  const confirmPw = document.getElementById('pw-confirm').value;
+  const st = document.getElementById('pw-status');
+  if (!oldPw) { st.innerHTML = '<span style="color:var(--danger)">请输入当前密码</span>'; return; }
+  if (!newPw) { st.innerHTML = '<span style="color:var(--danger)">请输入新密码</span>'; return; }
+  if (newPw.length < 6) { st.innerHTML = '<span style="color:var(--danger)">新密码至少 6 位</span>'; return; }
+  if (newPw !== confirmPw) { st.innerHTML = '<span style="color:var(--danger)">两次输入的新密码不一致</span>'; return; }
+  st.innerHTML = '<span style="color:var(--text-secondary)"><span class="loading"></span> 提交中...</span>';
+  try {
+    const r = await fetch('/cgi-bin/password?action=change&old=' + encodeURIComponent(oldPw) + '&new=' + encodeURIComponent(newPw));
+    const t = await r.text();
+    if (t.includes('OK')) {
+      st.innerHTML = '<span style="color:var(--success)">✅ 密码修改成功！下次登录请使用新密码</span>';
+      document.getElementById('pw-old').value = '';
+      document.getElementById('pw-new').value = '';
+      document.getElementById('pw-confirm').value = '';
+    } else {
+      st.innerHTML = '<span style="color:var(--danger)">❌ ' + escapeHtml(t.replace(/\n/g,' ')) + '</span>';
+    }
+  } catch (e) {
+    st.innerHTML = '<span style="color:var(--danger)">请求失败：' + escapeHtml(e.message) + '</span>';
+  }
+}
+
+async function setDefaultPwd() {
+  if (!confirm('将密码重置为 admin/admin？\n（仅在认证未启用时可用）')) return;
+  const st = document.getElementById('pw-status');
+  st.innerHTML = '<span style="color:var(--text-secondary)"><span class="loading"></span> 重置中...</span>';
+  try {
+    const r = await fetch('/cgi-bin/password?action=reset');
+    const t = await r.text();
+    if (t.includes('OK')) {
+      st.innerHTML = '<span style="color:var(--success)">✅ 已重置为 admin/admin</span>';
+      loadAuthStatus();
+    } else {
+      st.innerHTML = '<span style="color:var(--danger)">❌ ' + escapeHtml(t.replace(/\n/g,' ')) + '</span>';
+      loadAuthStatus();
+    }
+  } catch (e) {
+    st.innerHTML = '<span style="color:var(--danger)">请求失败</span>';
+  }
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

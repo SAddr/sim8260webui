@@ -1,0 +1,187 @@
+#!/bin/sh
+# Simcom WebUI - SMS CGI
+# 用 microcom 通过 socat PTY 桥接（或直连 smd8）和模块 AT 口通信
+#
+# action: list | read | send | del
+
+# 加载公共库
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+. "$SCRIPT_DIR/libat.sh"
+
+# 解析 QUERY_STRING
+ACTION=""
+NUM=""
+MSG=""
+INDEX=""
+
+OIFS="$IFS"; IFS='&'; set -f
+for pair in $QUERY_STRING; do
+    key=$(echo "$pair" | cut -d= -f1)
+    val=$(echo "$pair" | cut -d= -f2-)
+    case "$key" in
+        action) ACTION=$(urldecode "$val");;
+        num)    NUM=$(urldecode "$val");;
+        msg)    MSG=$(urldecode "$val");;
+        index)  INDEX=$(urldecode "$val");;
+    esac
+done
+IFS="$OIFS"; set +f
+
+echo "Content-Type: text/plain; charset=utf-8"
+echo "Cache-Control: no-store"
+echo ""
+
+# 找 AT 设备
+AT_DEVICE=$(find_at_device)
+if [ -z "$AT_DEVICE" ]; then
+    echo "ERROR: No AT device"
+    exit 1
+fi
+
+# 原子锁（路径由 at-runenv.sh 解析，和看门狗探活用的是同一把锁）
+if ! acquire_at_lock "$AT_LOCK"; then
+    exit 1
+fi
+
+# 清缓冲
+flush_at_buffer "$AT_DEVICE"
+
+case "$ACTION" in
+    list)
+        # 优先用 PDU 模式(CMGF=0)读取，才能拿到 TP-UDH（长短信分片引用号/总段数/段号），
+        # 前端据此把拆分的多条短信重组回一条。
+        # 注意：PDU 模式下 AT+CMGL 的 <stat> 必须是数字(0..4)，4=ALL，不能用文本模式的 "ALL"。
+        send_at "$AT_DEVICE" "AT+CMGF=0" 2 >/dev/null
+        RESULT=$(send_at "$AT_DEVICE" 'AT+CMGL=4' 8)
+        HAS_PDU=$(echo "$RESULT" | grep -c '^+CMGL:' 2>/dev/null)
+
+        # 若 PDU 模式没读到（模块不支持/返回 ERROR/兼容问题），回退文本模式读取，
+        # 保证收件箱始终有内容可看（此时无 UDH，分片不会合并，但不会空）。
+        if [ "$HAS_PDU" -eq 0 ] 2>/dev/null; then
+            send_at "$AT_DEVICE" "AT+CMGF=1" 2 >/dev/null
+            send_at "$AT_DEVICE" 'AT+CSDH=1' 2 >/dev/null
+            RESULT=$(send_at "$AT_DEVICE" 'AT+CMGL="ALL"' 8)
+        fi
+
+        # PDU: "+CMGL: <idx>,<stat>,[<alpha>],<len>\r\n<pdu>"；文本模式则是常规 CMGL 头+正文。
+        # 统一透传数据行，去掉命令回显(^AT)、末尾 OK/ERROR、空行。
+        echo "$RESULT" | awk '
+            /^AT/ { next }     # 去掉命令回显
+            /^OK$/ { next }    # 去掉最终 OK
+            /^\+CMS ERROR|^ERROR/ { next }
+            /^[[:space:]]*$/ { next }  # 去掉空行
+            { print }          # +CMGL 头行 + 数据/pdu 行原样输出
+        '
+        ;;
+
+    read)
+        # INDEX 会被直接拼进 AT 命令，必须先确保它只由数字组成，
+        # 否则 URL 里塞个引号/回车就能把一条 AT 拆成两条（AT 层命令注入）。
+        case "$INDEX" in
+            ''|*[!0-9]*) echo "ERROR: index 必须是非负整数"; exit 1;;
+        esac
+        # 优先 PDU 模式读取单条（与 list 一致，兼容分片短信重组）；PDU 无结果则回退文本模式。
+        send_at "$AT_DEVICE" "AT+CMGF=0" 2 >/dev/null
+        RESULT=$(send_at "$AT_DEVICE" "AT+CMGR=$INDEX" 5)
+        if ! echo "$RESULT" | grep -q '^+CMGR:' 2>/dev/null; then
+            send_at "$AT_DEVICE" "AT+CMGF=1" 2 >/dev/null
+            send_at "$AT_DEVICE" 'AT+CSDH=1' 2 >/dev/null
+            RESULT=$(send_at "$AT_DEVICE" "AT+CMGR=$INDEX" 5)
+        fi
+        echo "$RESULT" | awk '
+            /^AT/ { next }
+            /^OK$/ { next }
+            /^\+CMS ERROR|^ERROR/ { next }
+            /^[[:space:]]*$/ { next }
+            { print }
+        '
+        ;;
+
+    send)
+        if [ -z "$NUM" ]; then echo "ERROR: missing number"; exit 1; fi
+        if [ -z "$MSG" ]; then echo "ERROR: missing message"; exit 1; fi
+
+        # 号码会被拼进 AT+CMGS="<num>"，必须清洗，防止 AT 层命令注入
+        # （例如 num=13800138000"<CR>AT+CFUN=0 就能拆出一条新 AT 命令）。
+        case "$NUM" in
+            *[!0-9+*#]*) echo "ERROR: 号码含非法字符（只允许 0-9 与 + * #）"; exit 1;;
+        esac
+
+        # microcom 是发送通路唯一的实现，缺了就直接说清楚，
+        # 否则只会表现为 20s 后一句没头没脑的 "TIMEOUT:无响应"。
+        if ! command -v microcom >/dev/null 2>&1; then
+            echo "ERROR: 缺少 microcom（发送短信依赖它）"
+            exit 1
+        fi
+
+        # =============================================================
+        # 文本模式发送参数（本地实测结论，改动前务必重测）
+        # -------------------------------------------------------------
+        # 模块 AT+CSMP 出厂默认 17,167,0,8 —— <dcs>=8 表示 UCS2 编码。
+        # 若保持 DCS=8 却把正文当明文发，SIM82XX 直接返回：
+        #     +CMS ERROR: Invalid text mode parameter   ← 之前发送失败的根因
+        # 该错误与 CSCS 取值无关（IRA/GSM 都报），根因是 DCS 与正文编码方式不匹配。
+        #
+        # 另一个坑：若把 CSCS 一并切成 "UCS2"，号码也会被当成 UCS2 十六进制解析，
+        # 且实测号码一旦不带 '+' 就同样报 "Invalid text mode parameter"。
+        # 因此这里统一保持 CSCS="GSM"：号码始终按明文处理（带不带 '+' 都正常），
+        # 只按正文内容切换 CSMP 的 DCS，并对 UCS2 正文做十六进制编码：
+        #     DCS=0 → 正文明文（GSM 7-bit，纯英文/数字）
+        #     DCS=8 → 正文须为 UTF-16BE 十六进制串
+        # 已用 CMGW 写入 + PDU 回读验证：中文正文落地为 4E2D6587（即"中文"）。
+        # =============================================================
+        send_at "$AT_DEVICE" 'AT+CSCS="GSM"' 2 >/dev/null
+        if is_ascii_text "$MSG"; then
+            # 纯 ASCII 走 GSM 7-bit：单条 160 字符。这里是字节数，ASCII 下即字符数。
+            if [ "${#MSG}" -gt 160 ]; then
+                echo "ERROR: 纯英文/数字单条上限 160 字符，当前 ${#MSG}（长短信分片未实现）"
+                exit 1
+            fi
+            send_at "$AT_DEVICE" 'AT+CSMP=17,167,0,0' 2 >/dev/null
+            CMGS_MSG="$MSG"
+        else
+            send_at "$AT_DEVICE" 'AT+CSMP=17,167,0,8' 2 >/dev/null
+            CMGS_MSG=$(utf8_to_ucs2hex "$MSG")
+            # 先编码再计长度：UCS2 单条上限是 70 个 UTF-16 码元，
+            # 而十六进制串每 4 个字符 = 1 个码元，所以这里数出来正好是字符数。
+            # （不能用 ${#MSG} —— 那是 UTF-8 字节数，一个汉字 3 字节，会误判为超长。）
+            _ucs2_n=$(( ${#CMGS_MSG} / 4 ))
+            if [ "$_ucs2_n" -gt 70 ]; then
+                echo "ERROR: 含中文/表情单条上限 70 字符（UCS2），当前 ${_ucs2_n}（长短信分片未实现）"
+                exit 1
+            fi
+        fi
+        send_at "$AT_DEVICE" "AT+CMGF=1" 2 >/dev/null
+
+        # 构造 CMGS 完整输入：号码 + \r + 内容 + CTRL-Z (0x1a)
+        RESULT=$(printf 'AT+CMGS="%s"\r%s\x1a' "$NUM" "$CMGS_MSG" | microcom -X -t 20000 "$AT_DEVICE" 2>/dev/null)
+
+        if echo "$RESULT" | grep -q '^+CMGS:' 2>/dev/null; then
+            echo "OK:发送成功"
+            echo "$RESULT" | grep '^+CMGS:'
+        elif echo "$RESULT" | grep -qE 'ERROR|CMS ERROR' 2>/dev/null; then
+            echo "FAIL:发送失败"
+            echo "$RESULT" | grep -E 'ERROR|CMS ERROR'
+        else
+            echo "TIMEOUT:无响应"
+        fi
+        ;;
+
+    del)
+        if [ -z "$INDEX" ]; then echo "ERROR: missing index"; exit 1; fi
+        case "$INDEX" in
+            ''|*[!0-9]*) echo "ERROR: index 必须是非负整数"; exit 1;;
+        esac
+        RESULT=$(send_at "$AT_DEVICE" "AT+CMGD=$INDEX" 3)
+        if echo "$RESULT" | grep -qE '(^|[[:space:]])OK($|[[:space:]])' 2>/dev/null; then
+            echo "OK:已删除"
+        else
+            echo "FAIL:删除失败"
+            echo "$RESULT" | grep -E 'ERROR|CMS ERROR'
+        fi
+        ;;
+
+    *)
+        echo "ERROR: unknown action. use list|read|send|del"
+        ;;
+esac
