@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="pyOnq2PSGQUSkmHbWDhADk">
+<head data-page-node-id="ZtdzzUxAES4Ee086lJ0ONd">
+  <meta charset="UTF-8" data-page-node-id="YgTbFoBaamHf9BEGcruOdk" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" data-page-node-id="o4BZZquWxEqJ8QApAPFZGW" />
+  <title>网络配置 · SIM8260</title>
+  <script src="js/wb-theme.js"></script>
+  <script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/styles.css" data-page-node-id="XCi8x9Cuh9LQBLffE0mo4F" />
+</head>
+<body data-page-node-id="CEmQUipVS3uhFTBXrbWjfU">
+
+<header class="topbar" data-page-node-id="G6wp8DK4JgkI8P2KSzUYNY">
+  <div class="brand" data-page-node-id="oLikERvxAWWAhB4EbGAb9A">
+    <div class="brand-logo" data-page-node-id="77bMaHva8NUd82AtsgT7FE">S</div>
+    <div data-page-node-id="XYwVI1aAmMbsdlSW41cbZJ">
+      <div class="brand-title" data-page-node-id="HUFQDIXMufH7d7O9ggrqzF">SIM8260 Control Center</div>
+      <div class="brand-subtitle" data-page-node-id="VIr7qSkBkjFGDdeGeUoiaM">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs" data-page-node-id="kiE0zfnVJXlEL7MqVjBW97">
+    <a href="index.html" class="nav-tab" data-page-node-id="fELP8PEJT6lprKmXFALutG">总览</a>
+    <a href="signal.html" class="nav-tab" data-page-node-id="XuLu8VbdLzIPkpugPMu0zb">信号</a>
+    <a href="network.html" class="nav-tab active" data-page-node-id="hNXb58VXNMLzGMlN49dBYP">网络</a>
+    <a href="device.html" class="nav-tab" data-page-node-id="B9F7VaLFne0FQOhCBCnH7p">设备</a>
+    <a href="sms.html" class="nav-tab" data-page-node-id="aI7K1RGBPBsyCX0EBcbNzU">短信</a>
+    <a href="atcmd.html" class="nav-tab" data-page-node-id="Dqjaf5FqFVP7DMMOCmXlop">AT 命令</a>
+    <a href="settings.html" class="nav-tab" data-page-node-id="01qAFTBudL8FaS5IeBnluH">设置</a>
+  </nav>
+  <div class="topbar-foot" data-page-node-id="AQlRFZakZh04fQyIWB78qa"><span class="status-pill online" data-page-node-id="EqTmN7BL6GlrNPNnNWEM8c"><span class="status-dot" data-page-node-id="c17VIBkfWhytRO6PrWWIzz"></span>已连接</span></div>
+</header>
+
+<main class="container" data-page-node-id="v9qkFF9QCdmF7nTM1EJywk">
+  <div data-page-node-id="uV5M2fh20Vd6IvooR8NabB">
+    <h1 class="page-title" data-page-node-id="8EH8PcwDF8PeWGzVUHL0r0">网络配置</h1>
+    <p class="page-subtitle" data-page-node-id="AJ37bA5igOgXJqG7z9xDox">拨号管理、APN 设置、网口模式</p>
+  </div>
+
+  <!-- 拨号状态 -->
+  <div class="grid grid-dash" data-page-node-id="MW0WO6ZELnC4c5TAW2yIQS">
+    <div class="card col-4" data-page-node-id="qo5jrdEpFDBrIHpJAypG4o">
+      <div class="card-header" data-page-node-id="037DSZM5luFsydC7tR6MIy">
+        <div class="card-title" data-page-node-id="Lj0osXnY5o3nbAMHanbBBB"><span class="icon" data-page-node-id="Yr4tKwfrsacCD0vBgBJ05C">🌐</span> WWAN 拨号</div>
+        <span class="status-pill" id="wwan-pill" data-page-node-id="6gEEo0iCOSAgCRCHizytkh">
+          <span class="status-dot" data-page-node-id="9dwWMyo5NNzirz9TBQCD7C"></span>
+          <span id="wwan-status" data-page-node-id="Tj1OdIoxSrF8vQT6oN5Oso">检查中</span>
+        </span>
+      </div>
+      <table class="info-table" data-page-node-id="fVgbLFf01ECdQZAQ5gcROo">
+        <tr data-page-node-id="zvGB0DGV7QpNS4H6DsaTyO"><td data-page-node-id="EGKcyLbOV7yBDfznmAx2wK">IPv4 地址</td><td id="wwan-ip4" data-page-node-id="1d6qKA6mQ1STuFOdE7Slf4">--</td></tr>
+        <tr data-page-node-id="xc3eipDxdQcXkD8geXVFhy"><td data-page-node-id="EroNmkhB30TsBOguyrGQtM">IPv6 地址</td><td id="wwan-ip6" data-page-node-id="ipsHDPs7Kp6DZPwz1npyrH">--</td></tr>
+        <tr data-page-node-id="jf9JbCJDVRHqlImEmBz2gl"><td data-page-node-id="yrU2eoKnLpPhrZeep7fBwh">Profile ID</td><td id="wwan-pid" data-page-node-id="Hb0IxilJ5jR9PMvpwPPgCo">--</td></tr>
+      </table>
+      <div class="divider" data-page-node-id="3xkxO7IrkykZ4FoZNhy96Y"></div>
+      <div style="display:flex;gap:8px;" data-page-node-id="G0vqB1ge6kmh9BTR8YGt82">
+        <button class="btn btn-primary" onclick="dialUp()" data-page-node-id="FhrWllFXmOsrC0rFwcBWdA">连接</button>
+        <button class="btn btn-danger" onclick="dialDown()" data-page-node-id="lQAdEp2L2x62C1TU2uMKiz">断开</button>
+        <button class="btn" onclick="loadWWAN()" data-page-node-id="j0oCdxS7JNxwCHFGli5GSX">刷新</button>
+      </div>
+    </div>
+
+    <div class="card col-4" data-page-node-id="2ADRyfoZUOuiAVPSK8zHha">
+      <div class="card-header" data-page-node-id="DfcBPutL9dfwUeqwyAkiyo">
+        <div class="card-title" data-page-node-id="t2HLTBmz558GdECni1kQMl"><span class="icon" data-page-node-id="8AkEuU6b1l9E27GaAxonhc">🏠</span> LAN 设置</div>
+      </div>
+      <table class="info-table" data-page-node-id="TDFRLurnpYLx9xODAy4aCm">
+        <tr data-page-node-id="pybVwDKcHmGrTp3WFMSdd8"><td data-page-node-id="Nwa0Ep1a5arOGABBeNTjM3">LAN 网关 IP</td><td id="lan-gw" data-page-node-id="tpkCmhWIPXFkGDP9Hccbf0">--</td></tr>
+        <tr data-page-node-id="agtGoyPVbJsw0j1PrTaxsa"><td data-page-node-id="2Z0RncS4paC9sDe3niGImu">DHCP 起始</td><td id="lan-start" data-page-node-id="SeKBCEK6Xj8VFb7Za5j1Bf">--</td></tr>
+        <tr data-page-node-id="gnLQtI4EgyPZRV7udvTH4V"><td data-page-node-id="dcIwC5zheQAEwjA9wUT52F">DHCP 结束</td><td id="lan-end" data-page-node-id="BYkSlzHevDkGPFqy5O2Jdr">--</td></tr>
+        <tr data-page-node-id="SciG1jIEn2tW8HAa0b8F13"><td data-page-node-id="1rmKigyaxpyQavNT9FeuSJ">网口模式</td><td id="eth-mode" data-page-node-id="SgOPAz71tcGiFuJCAtqNp4">--</td></tr>
+      </table>
+      <div class="divider" data-page-node-id="OFBAUtk0Gb1fbzpqNH6izu"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" data-page-node-id="kqCeVh80iOLIIcx4EpLwJb">
+        <select class="select" id="eth-mode-select" style="max-width:180px;" data-page-node-id="0HfBlcJGsr4DyHxGMmIm6Q">
+          <option value="0" data-page-node-id="RyU8rXTsuFbBOQEEiCpU94">0 - LAN 路由器</option>
+          <option value="1" data-page-node-id="TaeFLVP6TugRGdBtBqe5JO">1 - WAN 路由器</option>
+          <option value="2" data-page-node-id="NjQyzgjiaFElRFYDJkY4Ih">2 - eth0 WAN + eth1 LAN</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="setEthMode()" data-page-node-id="AgQDtJxPuSUbZHZmLR1bm4">应用网口模式</button>
+      </div>
+    </div>
+
+    <!-- 网络模式 (3G/4G/5G) -->
+    <div class="card col-4" data-page-node-id="a8ZA0DQgLU8Z9tjAvdCYiI">
+      <div class="card-header" data-page-node-id="jpjUYNVbdMY5NBPp0AFYhg">
+        <div class="card-title" data-page-node-id="YW68wRGeLuyJmyZfUsBQbG"><span class="icon" data-page-node-id="qbCvWZDId0UPVK7DOArHWS">📶</span> 网络模式 (3G/4G/5G)</div>
+        <div class="card-action" onclick="loadNetMode()" data-page-node-id="JzoCY7EtCLGimPUSJUaEKH">⟳ 刷新</div>
+      </div>
+      <table class="info-table" data-page-node-id="Pz7d3O7Xs0uCb6jbBBUIdi">
+        <tr data-page-node-id="ebAPkgguugnZUbEKofD2jn"><td data-page-node-id="gFQLWrPZuA6BwK8ACXuffT">当前模式</td><td id="cnmp-cur" data-page-node-id="OUeaS0HkEfXkz9MGOcxCPA">--</td></tr>
+      </table>
+      <div class="divider" data-page-node-id="uOmULHuIVigm0xkyI5hIXk"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;" data-page-node-id="5dOosqZiVWZ753xEmQB2dA">
+        <select class="select" id="cnmp-select" data-page-node-id="VBWk3NDMvMA0WCpNCeFjPN">
+          <option value="2" data-page-node-id="nuK0LAhenyDMGHeLov4ebN">自动 (2)</option>
+          <option value="55" data-page-node-id="Nr9hxAeMCs0jOD9s6gb4of">3G+4G+5G (55)</option>
+          <option value="109" data-page-node-id="A1EXcTLB597PZ0uu5uzPAT">4G+5G (109)</option>
+          <option value="54" data-page-node-id="UDrwpAVwWv4uKTgefzkzYD">3G+4G (54)</option>
+          <option value="38" data-page-node-id="Gu8fJc2z7qJ7IIh6w6uINv">仅 4G LTE (38)</option>
+          <option value="71" data-page-node-id="ppvmW8jxafHCmaltLFFfQT">仅 5G NR (71)</option>
+          <option value="14" data-page-node-id="jSQckKjGo2xDlrZDT6Q3ru">仅 3G WCDMA (14)</option>
+        </select>
+        <button class="btn btn-primary btn-sm" onclick="setNetMode()" data-page-node-id="uloD8e8Gg0bnIloJnwd0lc">应用模式</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5;" data-page-node-id="MmHI5a0Sp3V3zjWVH9WhBE">
+        ⓘ 立即生效且掉电保存；切换后模块重新搜网，短暂断网属正常。
+      </div>
+    </div>
+  </div>
+
+  <!-- APN 设置 -->
+  <div class="card" style="margin-top:20px;" data-page-node-id="ug91t4kFNCgRuU3GdPSyBl">
+    <div class="card-header" data-page-node-id="IQcwENGHy70F7DFBQpgFGS">
+      <div class="card-title" data-page-node-id="aPe8rSJtBvLIGhHAi3Nw6x"><span class="icon" data-page-node-id="pTD5vAmXmNNfxASdIoosFR">🔧</span> APN 配置（全部 Profile）</div>
+      <div class="card-action" onclick="loadAPN()">⟳ 刷新</div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="tbl" style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;white-space:nowrap;">Profile</th>
+            <th style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;white-space:nowrap;">PDP 类型</th>
+            <th style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;">APN 名称</th>
+            <th style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;white-space:nowrap;">状态</th>
+            <th style="padding:6px 8px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:left;white-space:nowrap;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="apn-rows">
+          <tr><td colspan="5" style="padding:10px 8px;color:var(--text-muted);">加载中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+      ⓘ 修改 APN 后需要重新拨号才会生效。IMS / SOS 为系统保留 Profile，修改可能导致 IMS 或紧急呼叫异常，保存时会二次确认。
+    </div>
+  </div>
+
+  <!-- 射频与小区锁定 -->
+  <div class="grid grid-dash" style="margin-top:20px;" data-page-node-id="hRLntRonnH4RPkqRo8PrgF">
+    <!-- 锁频 -->
+    <div class="card col-6" data-page-node-id="ErZKHdB0hALU236IvNdfMo">
+      <div class="card-header" data-page-node-id="sncHHlA7eiwIh6CNrtO5o0">
+        <div class="card-title" data-page-node-id="ZOmAE9EtSp60GkMFWobzlf"><span class="icon" data-page-node-id="mJy7jLDB79m4XKGp40fxM3">🔒</span> 锁频 (Band Lock)</div>
+      </div>
+      <table class="info-table" data-page-node-id="s17V7sa9M61BaQf8EIVawf">
+        <tr data-page-node-id="VTYYQkMKBBfOW8fHTFHS2K"><td data-page-node-id="KSzugGhNHl9XHpYiJLH8x5">支持 LTE 频段</td><td id="lte-band-cur" data-page-node-id="NA5Jm6wixhQxhQOT3S4JFL">--</td></tr>
+        <tr data-page-node-id="GhqU4MRWteCuYQIN3fExGZ"><td data-page-node-id="aEl5gMgqjQrNWl2FGNMnrz">支持 NR SA 频段</td><td id="nr-band-cur" data-page-node-id="tveWwtsFxUVHyH5P4eFF0D">--</td></tr>
+        <tr data-page-node-id="xuXWAf2EPb7BDKgkvHjRNh"><td data-page-node-id="1usfx0NWg2br0gjJwJepCT">支持 NR NSA 频段</td><td id="nsa-band-cur" data-page-node-id="rkcstvp5qD1aARtTOMKkKs">--</td></tr>
+        <tr data-page-node-id="mFby7UqFiEOeu6uD3CKYxw"><td data-page-node-id="0BcahPJeAz61Lu1vglE6zD">支持 NRDC 频段</td><td id="nrdc-band-cur" data-page-node-id="oCvYu1DfEMlAC0kmHgriiP">--</td></tr>
+        <tr data-page-node-id="YYF5xqNNAmwnkIuEmTEvW4"><td data-page-node-id="m70e7ptfQzy18dUPcy4bNX">支持 WCDMA 频段</td><td id="w-band-cur" data-page-node-id="tXyMIrER0iOPMfTe62NCoR">--</td></tr>
+        <tr data-page-node-id="uHCs0A2CYkDeU32YklkCsl"><td data-page-node-id="t3duy29DrsNyIJ4UwafCaF">RAT 优先级</td><td id="rat-order-cur" data-page-node-id="2YBPOcRylE7rySkVMgKfc3">--</td></tr>
+        <tr data-page-node-id="nuIhtMfge1wttzKZCx6Tx4"><td data-page-node-id="AAWmPDS1g7Ek0MTOOMEA02">NR 禁用模式</td><td id="nr-disable-cur" data-page-node-id="WZxSwCRieTEkPjo0SD0FSS">--</td></tr>
+      </table>
+      <div class="divider" data-page-node-id="F2puNLDcKY0BWFD7Iy8aIR"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;" data-page-node-id="qtLpBY1dlcRPGBG8X8vrdz">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="PShsIvBgvsJ9MT9Kc6oykw">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="BlFmsFjjqjnEbsTHegfeou">LTE 频段</label>
+          <input type="text" class="input" id="lte-band-set" placeholder="如 B1:B3:B5:B8" style="flex:1;min-width:140px;" data-page-node-id="Vx1GcWdJhI4qegwTfItpLI" />
+          <button class="btn btn-sm" onclick="loadSupportedBands('lte')" data-page-node-id="GoFTELkIs0AF2uPtYB4jKd">查询支持</button>
+          <button class="btn btn-primary btn-sm" onclick="setBand('lte')" data-page-node-id="LWlFkCVVawl71SAZrdfN8C">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="HcT9MS92cVmLlO4ak40UUk">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="Hq2C7PzMwDuZO8QbJnzYwD">NR SA 频段</label>
+          <input type="text" class="input" id="nr-band-set" placeholder="如 n41:n78" style="flex:1;min-width:140px;" data-page-node-id="HFHimNzPV79z4y4GUezkWN" />
+          <button class="btn btn-sm" onclick="loadSupportedBands('nr')" data-page-node-id="8BiSWKCwsZbVNFOI0qU6L1">查询支持</button>
+          <button class="btn btn-primary btn-sm" onclick="setBand('nr')" data-page-node-id="tx1Pnjb0DUgVDgsW4LMmnQ">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="ByfPaaSZBBL0CVRMsOEm3Y">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="DDYXY1CbFQXep3CcnvYq0x">NR NSA 频段</label>
+          <input type="text" class="input" id="nsa-band-set" placeholder="如 n41:n78" style="flex:1;min-width:140px;" data-page-node-id="aVWRYRJtpXOwB1b2pmXYy5" />
+          <button class="btn btn-sm" onclick="loadSupportedBands('nsa')" data-page-node-id="sdmnIdKKUVUJ0ikfClKVvh">查询支持</button>
+          <button class="btn btn-primary btn-sm" onclick="setBand('nsa')" data-page-node-id="HhuqRPRIOBDC7IVXoEfiRh">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="FKCVM2xPPnCuVkGLXD98mt">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="ARmMyZ0MwlloUamlmQwWl8">NR 模式</label>
+          <select class="select" id="nr-disable-set" style="flex:1;min-width:140px;" data-page-node-id="C5zOUGJ75ZeBQCGL8lP12y">
+            <option value="0" data-page-node-id="7jTZRbUEHUJoLcwNyCUX9F">0 - 允许 SA 和 NSA</option>
+            <option value="1" data-page-node-id="o6cDDPxpLxJBVTvBHTwASn">1 - 禁用 SA</option>
+            <option value="2" data-page-node-id="oI3Vt5IiDpGD7lSnym0LKe">2 - 禁用 NSA</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="setNRAble()" data-page-node-id="3PcuuAyEo0sZzFdiVQLQKG">应用</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="kNX1AtDsRmXY0aWdXhkPnH">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="7okc7qTJpA5FemydlfqKRC">NRDC 频段</label>
+          <input type="text" class="input" id="nrdc-band-set" placeholder="如 n41:n78" style="flex:1;min-width:140px;" data-page-node-id="oBHPhFM0HF5vsJ1seLQpGi" />
+          <button class="btn btn-sm" onclick="loadSupportedBands('nrdc')" data-page-node-id="X9oyYADFj5Wj2om2MS22TB">查询支持</button>
+          <button class="btn btn-primary btn-sm" onclick="setBand('nrdc')" data-page-node-id="rVnc2gcNOEotT4UV2BvY7P">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="AuAsKTQKfakFZgh4b15VpA">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="I0byAOUyXHDjtHGqgSvE8G">WCDMA 频段</label>
+          <input type="text" class="input" id="w-band-set" placeholder="如 B1:B3:B5" style="flex:1;min-width:140px;" data-page-node-id="l4cHHWXJgiElBBfGPmQCfl" />
+          <button class="btn btn-sm" onclick="loadSupportedBands('w')" data-page-node-id="k82sPEgYUbp3T93Mdqi22O">查询支持</button>
+          <button class="btn btn-primary btn-sm" onclick="setBand('w')" data-page-node-id="yjdmVHahZh6mEdcbNPC25R">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="bZMszkcRVAmrrhBTwi3OuU">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="rKzqIJ5ktXqPOgg4472xI3">RAT 优先级</label>
+          <input type="text" class="input" id="rat-order-set" placeholder="如 12:9:5 (NR:LTE:WCDMA)" style="flex:1;min-width:140px;" data-page-node-id="XUFoZpdaczurRHf1xLkkWf" />
+          <button class="btn btn-primary btn-sm" onclick="setRatOrder()" data-page-node-id="90CyegH6dv7JbgGuMtAJo1">应用</button>
+        </div>
+        <!-- 支持频段多选面板 -->
+        <div id="band-picker" style="display:none;border:1px solid var(--border-accent);border-radius:10px;padding:10px;background:var(--primary-fade);" data-page-node-id="B10GltFNEtM2utS7Y2sSI1">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;" data-page-node-id="21lxyAjMZHax7HRxcPaHas">
+            <span id="band-picker-title" style="font-size:12px;color:var(--primary);font-weight:600;" data-page-node-id="Ph6R3SoZJZzqeeOawr9ctU"></span>
+            <div style="display:flex;gap:6px;" data-page-node-id="6z2LBxQu87nzmmc5i8iP5d">
+              <button class="btn btn-sm" onclick="bandPickAll()" data-page-node-id="erfp2ZI4R3FwWoxGf85BT2">全选</button>
+              <button class="btn btn-sm" onclick="bandPickNone()" data-page-node-id="yE2QHwi51FfpRlyx8Nrkhe">清空</button>
+              <button class="btn btn-primary btn-sm" onclick="applyBandPicker()" data-page-node-id="UE3DkRS18D4FrXKwVi5AyT">应用所选</button>
+            </div>
+          </div>
+          <div id="band-picker-list" style="display:flex;flex-wrap:wrap;gap:7px;max-height:150px;overflow:auto;" data-page-node-id="oAH86xmTqFIcQCqTDAkUsa"></div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:6px;" data-page-node-id="B0JGUr71BRbKpwY1WLcVJz">勾选所需频段，点击「应用所选」写入锁定。</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;" data-page-node-id="CAwOCPuVmNxBCRnhqUnRrb">
+          <button class="btn btn-danger btn-sm" onclick="resetAllBands()" data-page-node-id="Tf81m1VnDHUuyeu4W3TKTw">恢复所有频段默认</button>
+          <button class="btn btn-sm" onclick="loadBand()" data-page-node-id="FmBFJHW7liM0gsPlOCSIwO">刷新频段</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6;" data-page-node-id="rmED2cWoPiqSQVwPxNNHcc">
+          ⚠️ 频段用<strong data-page-node-id="NDoH7b0XFkMzNONkuWMBe8">冒号 :</strong>分隔（如 B1:B3:B5）。部分频段/命令需重启或随 RAT 选择顺序生效。误锁可能<strong data-page-node-id="DHthntyqnEelL9hg0r0ZyF">脱网</strong>。
+        </div>
+      </div>
+    </div>
+
+    <!-- 小区扫描 + 锁小区 -->
+    <div class="card col-6" data-page-node-id="B7VGF38CfxuLEDiK2zpT8F">
+      <div class="card-header" data-page-node-id="AJ6sMZAju677ifv3JcOglN">
+        <div class="card-title" data-page-node-id="SxfoMYvq6ceALVU8tb1EsP"><span class="icon" data-page-node-id="eayZtuMZgtoaZm7P1nVXxO">🔍</span> 小区扫描 / 锁小区</div>
+        <div class="card-action" onclick="loadCell()" data-page-node-id="oZfllESAaLKlH5PiCFbiw7">⟳ 刷新小区</div>
+      </div>
+      <table class="info-table" data-page-node-id="3hiyzN2q5L9HjhLH9Kczod">
+        <tr data-page-node-id="PaAqCEHTxBLKsRitoma18f"><td data-page-node-id="u6VXmbgYFToxRtSBdat0Xt">当前 RAT</td><td id="cell-rat" data-page-node-id="nKHEcEqoGlFcHgsvkyAZFG">--</td></tr>
+        <tr data-page-node-id="kBBPxkKlVCcAmpzqZ3Sbih"><td data-page-node-id="PwAwZCT3EwapHu6pN6z3Ys">运营商 PLMN</td><td id="cell-plmn" data-page-node-id="pWU0AzELWFglGOVbxNqVTt">--</td></tr>
+        <tr data-page-node-id="70yCrDpOnllcpZs1d0YxIH"><td data-page-node-id="KG9AlKCf98nc9FJy33JdnJ">PCI (物理小区)</td><td id="cell-pci" data-page-node-id="HbzpnD4zRCtYMsNvJcxmWU">--</td></tr>
+        <tr data-page-node-id="ZqJx1UkfTOkFj3Xj2e61F2"><td data-page-node-id="kCjKQjmRSuEEOEppoMVjaN">EARFCN (频点)</td><td id="cell-earfcn" data-page-node-id="fgxWaMdcV8yIAxtP72V51S">--</td></tr>
+        <tr data-page-node-id="GCFVleP8B5pdRK53SpiY7S"><td data-page-node-id="9eI2nBBnerjthlKyAF1yIB">频段 Band</td><td id="cell-band" data-page-node-id="Gtk086KYHj4GRrdcUmm3Qv">--</td></tr>
+        <tr data-page-node-id="556dXvXrwTJtfcpsbtXGDz"><td data-page-node-id="95J5TyjqSRO9cMt3MGMnzt">锁定状态</td><td id="cell-lock" data-page-node-id="uuMafGGf12V0W1jBQwVaBe">未锁定</td></tr>
+      </table>
+      <div class="divider" data-page-node-id="PWiW594oyf9jU6YNBkOUOg"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;" data-page-node-id="KjeavlwpzBbM2OzCeI73fy">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;" data-page-node-id="m4VqTs0rskeCpP6qd72rek">
+          <label style="font-size:12px;color:var(--text-secondary);" data-page-node-id="YHjxQDmMFUGaGDdKGgUrLy">当前小区快速填入：</label>
+          <button class="btn btn-sm" onclick="fillLock('lte')" data-page-node-id="sRih6rKprsSTIFAOmmXyf2">填 LTE 锁定框</button>
+          <button class="btn btn-sm" onclick="fillLock('nr')" data-page-node-id="tTXn09Ds3gELutzyyGR8eM">填 NR 锁定框</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="5sbD9WqKgqhnxo10LVINgG">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="7HT9cP4JCZBli6GpuLEM4A">锁 LTE 小区</label>
+          <input type="text" class="input" id="lte-pci" placeholder="PCI" style="width:80px;" data-page-node-id="QFEFZZS73Q5nY2ujcPkjdR" />
+          <input type="text" class="input" id="lte-earfcn" placeholder="EARFCN" style="width:110px;" data-page-node-id="XvhMR5xENkYmadgwXXcVVM" />
+          <button class="btn btn-primary btn-sm" onclick="lockLte()" data-page-node-id="e48WwTCZZCDZ5vHGioEljG">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-page-node-id="Ap3M3KO32p90FFTJE6cCqW">
+          <label style="font-size:12px;color:var(--text-secondary);width:110px;" data-page-node-id="f3hFSbuTAHYJkIGRPtT5Ru">锁 NR 小区</label>
+          <input type="text" class="input" id="nr-pci" placeholder="PCI" style="width:80px;" data-page-node-id="GODV8CcmvW2DAK1g1I1bph" />
+          <input type="text" class="input" id="nr-freq" placeholder="FREQ" style="width:100px;" data-page-node-id="I6FD88gbFjej5DdpOrjEzd" />
+          <select class="select" id="nr-scs" style="width:90px;" data-page-node-id="ABfGkSA2zpSkH06dUqL1UM">
+            <option value="0" data-page-node-id="qqkDcoW10GFDGuY54HSefo">SCS15</option>
+            <option value="1" data-page-node-id="lCUs4a0arkBflXxg9M7Nee">SCS30</option>
+            <option value="2" data-page-node-id="mVuDCmpUH3eA3HevvBfm0J">SCS60</option>
+            <option value="3" data-page-node-id="oW10maEjJgOVird1i7pMI0">SCS120</option>
+          </select>
+          <input type="text" class="input" id="nr-band" placeholder="BAND" style="width:80px;" data-page-node-id="PfIqw4mNUpgspwN1QoH4wk" />
+          <button class="btn btn-primary btn-sm" onclick="lockNr()" data-page-node-id="0d6zGk5TqKnNSKJgHzFE95">锁定</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;" data-page-node-id="Fcp81Soyh341bSLsQG42aU">
+          <button class="btn btn-danger btn-sm" onclick="unlockCell()" data-page-node-id="7jqE2vrKcY2324cjPdeKGK">清除 ALL 小区锁定</button>
+          <button class="btn btn-sm" onclick="scanNetworks()" data-page-node-id="O34j3c9xwKZTty5SKX5Nji">扫描运营商 (COPS=?)</button>
+        </div>
+        <div id="scan-result" style="font-size:12px;color:var(--text-muted);max-height:120px;overflow:auto;background:var(--bg-elevated,#0d1117);padding:8px;border-radius:6px;font-family:monospace;white-space:pre-wrap;" data-page-node-id="Haz0Yg63klCoutzo5JRE69"></div>
+        <div style="font-size:12px;color:var(--text-muted);line-height:1.6;" data-page-node-id="zOonRDjvr5FXsyh85rdUMc">
+          ⚠️ 「扫描运营商」使用 <strong data-page-node-id="eZI4Vv5SuWCYxKwh8x3IGz">AT+COPS=?</strong>，返回的是可见<strong data-page-node-id="vO0D09cqHKs3Gb8i7clqGn">运营商/网络</strong>列表（PLMN），并非相邻小区扫描。本模块未提供 AT 级"小区扫描"命令；锁小区需用下方 PCI + EARFCN/频率。NR 锁小区命令手册标注「尚未验证」，部分固件可能不支持。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer" data-page-node-id="XnRsYLbBrahLNNqGYnHbJJ">
+    Powered by @Valor
+  </div>
+</main>
+
+<script>
+// timeoutMs 可选：给慢命令（如 +CGPADDR）加超时，避免一个卡住的请求拖住渲染。
+async function sendAT(cmd, timeoutMs) {
+  let ctl = null, timer = null;
+  if (timeoutMs) {
+    try { ctl = new AbortController(); timer = setTimeout(function () { ctl.abort(); }, timeoutMs); } catch (e) { ctl = null; }
+  }
+  try {
+    const r = await fetch('/cgi-bin/atcmd?cmd=' + encodeURIComponent(cmd), ctl ? { signal: ctl.signal } : undefined);
+    return await r.text();
+  } catch (e) { return 'ERROR: ' + e.message; }
+  finally { if (timer) clearTimeout(timer); }
+}
+
+// 加载态工具：接口未返回时在相关字段显示 loading 指示而非空白
+function setWWANLoading(loading) {
+  const ids = ['wwan-ip4','wwan-ip6','wwan-pid','lan-gw','lan-start','lan-end','eth-mode'];
+  const status = document.getElementById('wwan-status');
+  const pill = document.getElementById('wwan-pill');
+  if (loading) {
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>'; });
+    if (pill) pill.className = 'status-pill';
+    if (status) status.textContent = '加载中…';
+  }
+  // 注意：loading=false 时**不要**把字段清回 '--'。
+  // 之前这里会 ids.forEach(...) 把全部字段置 '--'，而 loadWWAN 在末尾调用
+  // setWWANLoading(false)，结果把刚解析出的真实值（IPv4/IPv6/网关等）覆盖回 '--'，
+  // 导致页面永远显示无值。字段值由 loadWWAN 自己填充（真实值或 '--'），这里只负责加载态。
+}
+
+// IP 地址清洗：去引号、去空白（AT 返回的地址可能带引号）。
+function cleanIP(s) {
+  return (s || '').replace(/"/g, '').trim();
+}
+
+// IPv6 归一化：兼容「点分十进制 16 字节」与「冒号格式」两种返回，全 0 视为未分配。
+function normIPv6(s) {
+  const v = cleanIP(s);
+  if (!v) return '';
+  if (v.indexOf(':') >= 0) return /^0:0:0:0:0:0:0:0$|^::$/.test(v) ? '' : v;
+  if (v.indexOf('.') >= 0) {
+    const b = v.split('.').map(Number);
+    if (b.length === 16 && b.some(x => x > 0)) {
+      const g = [];
+      for (let i = 0; i < 16; i += 2) g.push(((b[i] << 8) | b[i + 1]).toString(16));
+      return g.join(':');
+    }
+  }
+  return '';
+}
+
+// IPv4 有效性：去引号后非空且非 0.0.0.0
+function validIPv4(s) {
+  const v = cleanIP(s);
+  return (v && v !== '0.0.0.0') ? v : '';
+}
+
+// 解析 AT+CQCMAP="WWAN"（主数据源）
+// +CQCMAP: "WWAN",<status>,<profileID>,<IP_family>,<IP_address>
+// 真机（Smartfren）：+CQCMAP: "WWAN",1,1,IPV4,10.161.221.27
+//                    +CQCMAP: "WWAN",0,1,IPV6,0:0:0:0:0:0:0:0
+function parseWWAN(text) {
+  const out = { status: false, pid: '', ip4: '', ip6: '' };
+  const lines = text.split('\n').map(l => l.replace(/\r$/, '').trim())
+                    .filter(l => /^\+CQCMAP:\s*"WWAN"/i.test(l));
+  for (const line of lines) {
+    const p = line.replace(/^\+CQCMAP:\s*"WWAN",\s*/i, '').split(',');
+    if (p.length < 4) continue;
+    if ((p[0] || '').trim() === '1') out.status = true;
+    const id = (p[1] || '').trim();
+    if (id) out.pid = id;
+    const fam = cleanIP(p[2]).toUpperCase();
+    if (fam === 'IPV4') { const v = validIPv4(p[3]); if (v) out.ip4 = v; }
+    else if (fam === 'IPV6') { const v = normIPv6(p[3]); if (v) out.ip6 = v; }
+  }
+  return out;
+}
+
+// 解析 AT+CGPADDR（兜底数据源）：<cid>,<IPv4>[,<IPv6点分16字节>]
+// 关键修复：只分配到 IPv4 时模块只返回 2 段（+CGPADDR: 1,10.161.221.27），
+// 旧代码要求 p.length >= 3 会把这类活跃行全部跳过 → IP 全空（Smartfren 场景）。
+// preferCid：优先取该 cid 的行（来自 WWAN 的 profileID），避免误取 IMS 的地址。
+// 判定地址段类型必须按点分十进制的**段数**，不能按位置：
+// 真机上 CGPADDR 同一份响应里三种形态并存：
+//   cid=6 → 10.192.70.230,36.8.132.99.44.32.22.22.24.217.205.201.118.221.104.70
+//           (IPv4 4段 + IPv6 16段)
+//   cid=2 → 36.8.133.99.42.49.222.16.24.217.205.196.210.82.7.74
+//           IPv6-only（IMS），16 段顶在原本放 IPv4 的位置上
+//   cid=1 → 10.161.221.27  IPv4-only（单栈运营商）
+// 写死 "p[1]=IPv4 / p[2]=IPv6" 会把 IMS 的 IPv6 误读成 IPv4。
+function splitAddr(s) {
+  const v = cleanIP(s);
+  if (!v) return null;
+  if (v.indexOf(':') >= 0) return { v4: '', v6: normIPv6(v) };
+  const n = v.split('.').length;
+  if (n === 4)  return { v4: validIPv4(v), v6: '' };
+  if (n === 16) return { v4: '', v6: normIPv6(v) };
+  return null;
+}
+
+// matchIp4：已知的 WWAN IPv4，用于反查真实 PDP 上下文。
+// CQCMAP 报的 profileID 与 CGPADDR 的 cid 不是同一套编号（实测 WWAN 报 pid=1，
+// 但真正上网的在 cid=6），靠 IPv4 地址匹配才可靠。
+function parseCGPADDR(text, preferCid, matchIp4) {
+  const lines = text.split('\n').map(l => l.replace(/\r$/, '').trim())
+                    .filter(l => /^\+CGPADDR:/i.test(l));
+  const recs = [];
+  for (const line of lines) {
+    const p = line.replace(/^\+CGPADDR:\s*/i, '').split(',');
+    if (p.length < 2) continue;
+    const cid = (p[0] || '').trim();
+    let ip4 = '', ip6 = '';
+    const a1 = splitAddr(p[1]);
+    if (a1) { ip4 = a1.v4; ip6 = a1.v6; }
+    if (p.length >= 3) {
+      const a2 = splitAddr(p[2]);
+      if (a2) { ip4 = ip4 || a2.v4; ip6 = ip6 || a2.v6; }
+    }
+    if (!ip4 && !ip6) continue;
+    recs.push({ pid: cid, ip4: ip4, ip6: ip6, status: true });
+  }
+  if (!recs.length) return null;
+  if (matchIp4) {
+    const r = recs.find(x => x.ip4 && x.ip4 === matchIp4);
+    if (r) return r;
+  }
+  if (preferCid) {
+    const r = recs.find(x => x.pid === String(preferCid));
+    if (r) return r;
+  }
+  // 兜底优先取有 IPv4 的：IMS 通常只有 IPv6，用它兜底会把 IMS 地址显示成上网 IP
+  return recs.find(x => x.ip4) || recs[0];
+}
+
+async function loadWWAN() {
+  // 进入加载态
+  setWWANLoading(true);
+  // 独立查询。真机实测：AT+CQCMAP="WWAN" 在分号合并命令里模块不返回响应
+  // （固件不支持该命令的分号组合），+CGPADDR 慢会拖累后续命令，故都拆开查。
+  // 主数据源用 WWAN（直接给 status/profileID，且比 CGPADDR 快约 2s），
+  // 只有它拿不到有效地址时才回退 CGPADDR，省掉一次 2.9s 的慢查询。
+  let wwan = { status: false, pid: '', ip4: '', ip6: '' };
+  let pid = '--', ip4 = '--', ip6 = '--', connected = false;
+  // WWAN 字段 + 状态 + APN「上网中」标记的渲染。抽成函数是为了能在
+  // CGPADDR 慢查询**之前**先渲染一次：IPv4 的显示不能挂在慢查询后面
+  // （Smartfren 上 CGPADDR 要遍历全部 profile，CGI 侧 3s 超时，一旦
+  // 慢/卡/被上一条命令的残留污染，IPv4 就跟着一起不显示）。
+  const renderWWANCore = () => {
+    document.getElementById('wwan-ip4').textContent = ip4;
+    document.getElementById('wwan-ip6').textContent = ip6;
+    document.getElementById('wwan-pid').textContent = pid;
+    // 让 APN 列表标出「当前上网用的 profile」（不同运营商 cid 不同，不能写死）
+    window.__wwanPid = (pid && pid !== '--') ? String(pid) : '';
+    updateApnBadges();
+    const pill = document.getElementById('wwan-pill');
+    const txt = document.getElementById('wwan-status');
+    if (connected) {
+      pill.className = 'status-pill online';
+      txt.textContent = '已连接';
+    } else {
+      pill.className = 'status-pill offline';
+      txt.textContent = '已断开';
+    }
+  };
+  try {
+    wwan = parseWWAN(await sendAT('AT+CQCMAP="WWAN"'));
+  } catch (e) {}
+  if (wwan.ip4 || wwan.ip6 || wwan.status) {
+    pid = wwan.pid || '--';
+    ip4 = wwan.ip4 || '--';
+    ip6 = wwan.ip6 || '--';
+    connected = wwan.status || !!(wwan.ip4 || wwan.ip6);
+    renderWWANCore();   // 先渲染，下面补查 IPv6 不影响 IPv4 的显示
+    // CQCMAP 常常只回 IPv4 一行，即便 PDP=IPV4V6 且网络真的分配了 IPv6。
+    // 真机：WWAN 只给 "IPV4,10.192.70.230"，而 IPv6 在 CGPADDR 的 cid=6 上。
+    // 所以 IPv6 为空时补查一次；匹配到的 cid 同时修正 pid —— CQCMAP 的
+    // profileID 与 CGDCONT 的 cid 不是同一套编号（报 1，实际 6），
+    // 而 APN 列表是靠 pid 标「上网中」的，标错会指向未激活的 profile。
+    if (ip6 === '--') {
+      try {
+        const c = parseCGPADDR(await sendAT('AT+CGPADDR', 8000), wwan.pid, wwan.ip4);
+        if (c) {
+          ip6 = c.ip6 || '--';
+          if (ip4 === '--') ip4 = c.ip4 || '--';
+          if (c.pid) pid = c.pid;   // 用真实 cid 修正（CQCMAP 的 pid 与它不同源）
+          renderWWANCore();
+        }
+      } catch (e) {}
+    }
+  } else {
+    // 兜底：CGPADDR（优先匹配 WWAN 的 profileID，避免误取 IMS 地址）
+    try {
+      const c = parseCGPADDR(await sendAT('AT+CGPADDR', 8000), wwan.pid);
+      if (c) { pid = c.pid || '--'; ip4 = c.ip4 || '--'; ip6 = c.ip6 || '--'; connected = true; }
+    } catch (e) {}
+  }
+  const lan = await sendAT('AT+CQCMAP="LANIP"');
+  const eth = await sendAT('AT+CWETHMODE?');
+
+  renderWWANCore();
+
+  // ---- LAN（手册 19.2.4）：+CQCMAP:"LANIP",<start>,<end>,<GW> ----
+  const lanLine = lan.split('\n').map(l => l.replace(/\r$/, '').trim())
+                     .find(l => /^\+CQCMAP:\s*"LANIP"/i.test(l));
+  if (lanLine) {
+    const p = lanLine.replace(/^\+CQCMAP:\s*"LANIP",\s*/i, '').split(',');
+    document.getElementById('lan-gw').textContent   = (p[2] || '').replace(/"/g,'').trim() || '--';
+    document.getElementById('lan-start').textContent = (p[0] || '').replace(/"/g,'').trim() || '--';
+    document.getElementById('lan-end').textContent   = (p[1] || '').replace(/"/g,'').trim() || '--';
+  } else {
+    document.getElementById('lan-gw').textContent = '--';
+    document.getElementById('lan-start').textContent = '--';
+    document.getElementById('lan-end').textContent = '--';
+  }
+
+  // ---- ETH 模式 ----
+  const ethLine = eth.split('\n').map(l => l.replace(/\r$/, '').trim())
+                     .find(l => l.startsWith('+CWETHMODE:'));
+  if (ethLine) {
+    const v = ethLine.replace('+CWETHMODE:', '').trim();
+    const map = { '0': 'LAN 路由器', '1': 'WAN 路由器', '2': 'eth0 WAN + eth1 LAN' };
+    document.getElementById('eth-mode').textContent = v + ' - ' + (map[v] || '未知');
+    document.getElementById('eth-mode-select').value = v;
+  } else {
+    document.getElementById('eth-mode').textContent = '--';
+  }
+  setWWANLoading(false);
+}
+
+async function dialUp() {
+  const r = await sendAT('AT+CQCMAP="connect",0,1');
+  alert('拨号指令已发送：\n' + r);
+  setTimeout(loadWWAN, 3000);
+}
+async function dialDown() {
+  const r = await sendAT('AT+CQCMAP="connect",0,0');
+  alert('断开指令已发送：\n' + r);
+  setTimeout(loadWWAN, 1500);
+}
+async function setEthMode() {
+  const v = document.getElementById('eth-mode-select').value;
+  const r = await sendAT('AT+CWETHMODE=' + v);
+  alert('已设置网口模式为 ' + v + '\n' + r);
+  loadWWAN();
+}
+/* ============ APN 配置（全部 PDP context profile）============ */
+// AT+CGDCONT?  读：+CGDCONT: <cid>,<PDP_type>,<APN>,<...>
+// AT+CGDCONT=<cid>,"<PDP_type>","<APN>"  写：逐条保存，cid 由列表行决定。
+// 说明：不同运营商激活的 cid 不同（中国卡常见 cid=6，Smartfren 实测 cid=1），
+// 所以不能只配置 profile 1，必须支持全部 profile 读写。
+let __apnProfiles = [];   // [{cid, pdp, apn}]
+
+// 系统保留的 APN（改了会导致 IMS/紧急呼叫异常），保存前二次确认
+function isReservedApn(apn) {
+  return /^(IMS|SOS|EMERGENCY)$/i.test((apn || '').trim());
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function pdpOptions(cur) {
+  const list = ['IP', 'IPV6', 'IPV4V6'];
+  if (cur && list.indexOf(cur) < 0) list.push(cur);   // 保留模块返回的非常见类型
+  const label = { IP: 'IP (IPv4)', IPV6: 'IPV6', IPV4V6: 'IPV4V6 (双栈)' };
+  return list.map(v =>
+    '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + (label[v] || v) + '</option>'
+  ).join('');
+}
+
+// 渲染 profile 列表（每行 = cid + PDP 下拉 + APN 输入 + 状态 + 保存）
+function renderAPN() {
+  const tb = document.getElementById('apn-rows');
+  if (!tb) return;
+  if (!__apnProfiles.length) {
+    tb.innerHTML = '<tr><td colspan="5" style="padding:10px 8px;color:var(--text-muted);">未读到 PDP 上下文</td></tr>';
+    return;
+  }
+  tb.innerHTML = __apnProfiles.map(p => {
+    const active = (window.__wwanPid && p.cid === String(window.__wwanPid));
+    const reserved = isReservedApn(p.apn);
+    return '<tr>' +
+      '<td style="padding:6px 8px;">' + p.cid + '</td>' +
+      '<td style="padding:6px 8px;"><select class="select" id="apn-type-' + p.cid + '">' + pdpOptions(p.pdp) + '</select></td>' +
+      '<td style="padding:6px 8px;"><input type="text" class="input" id="apn-name-' + p.cid + '" value="' + escapeHtml(p.apn) + '" placeholder="留空 = 不设置 APN" style="width:100%;min-width:140px;" /></td>' +
+      '<td style="padding:6px 8px;white-space:nowrap;" id="apn-badge-' + p.cid + '">' + apnBadge(p) + '</td>' +
+      '<td style="padding:6px 8px;white-space:nowrap;"><button class="btn btn-primary btn-sm" onclick="saveAPN(\'' + p.cid + '\')">保存</button></td>' +
+      '</tr>';
+  }).join('');
+}
+
+function apnBadge(p) {
+  const active = (window.__wwanPid && p.cid === String(window.__wwanPid));
+  if (active) return '<span class="status-pill online"><span class="status-dot"></span>上网中</span>';
+  if (isReservedApn(p.apn)) return '<span style="font-size:11px;color:var(--text-muted);">系统保留</span>';
+  return '<span style="font-size:11px;color:var(--text-muted);">空闲</span>';
+}
+
+// 只更新状态列，不重建整表（避免覆盖用户正在编辑的输入）
+function updateApnBadges() {
+  __apnProfiles.forEach(p => {
+    const td = document.getElementById('apn-badge-' + p.cid);
+    if (td) td.innerHTML = apnBadge(p);
+  });
+}
+
+async function loadAPN() {
+  try {
+    const r = await sendAT('AT+CGDCONT?');
+    const rows = [];
+    r.split('\n').map(l => l.replace(/\r$/, '').trim())
+     .filter(l => /^\+CGDCONT:/i.test(l))
+     .forEach(l => {
+       const p = l.replace(/^\+CGDCONT:\s*/i, '').split(',');
+       if (p.length < 3) return;
+       const cid = (p[0] || '').trim();
+       if (!/^\d+$/.test(cid)) return;              // 跳过非数字 cid 的异常行
+       rows.push({ cid: cid, pdp: (p[1] || '').replace(/"/g, '').trim().toUpperCase(),
+                   apn: (p[2] || '').replace(/"/g, '').trim() });
+     });
+    __apnProfiles = rows;
+    renderAPN();
+  } catch (e) {
+    const tb = document.getElementById('apn-rows');
+    if (tb) tb.innerHTML = '<tr><td colspan="5" style="padding:10px 8px;color:var(--text-muted);">读取失败</td></tr>';
+  }
+}
+
+// 保存指定 profile（cid 来自列表行）
+async function saveAPN(cid) {
+  const typeEl = document.getElementById('apn-type-' + cid);
+  const nameEl = document.getElementById('apn-name-' + cid);
+  if (!typeEl || !nameEl) return;
+  const type = typeEl.value;
+  // APN 名里不允许出现引号/逗号/分号 —— 它们会破坏 AT 命令语法：
+  // name 含 " 时命令变成 AT+CGDCONT=1,"IP","a"b" ，模块直接回 ERROR。
+  // 这里直接剔除而不是转义：GSM 规范的 APN 本身只含字母/数字/点/连字符。
+  const name = nameEl.value.trim().replace(/[";,\r\n]/g, '');
+  if (!type) { alert('请选择 PDP 类型'); return; }
+  // 允许空 APN（部分专用网络无需 APN，或用户主动清空 APN）。
+  const old = __apnProfiles.find(p => p.cid === String(cid));
+  if (old && isReservedApn(old.apn) && old.apn !== name) {
+    if (!confirm('Profile ' + cid + ' 当前是系统保留 APN「' + old.apn + '」，' +
+                 '修改可能导致 IMS 或紧急呼叫异常。确定继续？')) return;
+  }
+  const cmd = 'AT+CGDCONT=' + cid + ',"' + type + '","' + name + '"';
+  const r = await sendAT(cmd);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? ('Profile ' + cid + ' 已保存：\n' + r) : ('Profile ' + cid + ' 保存失败：\n' + r));
+  loadAPN();
+}
+
+/* ============ 网络模式 (3G/4G/5G) —— 手册 4.2.11 AT+CNMP ============ */
+// 写命令立即生效且掉电保存；最大响应时间 10s。
+const CNMP_MAP = {
+  '2':   '自动 (2)',
+  '14':  '仅 3G WCDMA (14)',
+  '38':  '仅 4G LTE (38)',
+  '71':  '仅 5G NR (71)',
+  '54':  '3G+4G (54)',
+  '55':  '3G+4G+5G (55)',
+  '109': '4G+5G (109)'
+};
+async function loadNetMode() {
+  const el = document.getElementById('cnmp-cur');
+  el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>';
+  const r = await sendAT('AT+CNMP?');
+  const line = r.split('\n').map(l => l.replace(/\r$/, '').trim())
+                .find(l => /^\+CNMP:/i.test(l));
+  if (!line) { el.textContent = '--'; return; }
+  const v = line.replace(/^\+CNMP:\s*/i, '').trim();
+  el.textContent = CNMP_MAP[v] || (v + ' - 未知');
+  if (CNMP_MAP[v]) document.getElementById('cnmp-select').value = v;
+}
+async function setNetMode() {
+  const v = document.getElementById('cnmp-select').value;
+  if (!confirm('确定切换网络模式为「' + CNMP_MAP[v] + '」？\n切换后模块会重新搜网，可能短暂断网。')) return;
+  const r = await sendAT('AT+CNMP=' + v);
+  if (/OK/.test(r)) {
+    alert('已应用：' + CNMP_MAP[v]);
+  } else {
+    alert('设置失败：\n' + r);
+  }
+  setTimeout(loadNetMode, 1500);
+}
+
+/* ============ 射频与小区锁定 ============ */
+
+// 从 CSYSSEL 输出解析某 key 的当前值（容忍回车/空行）
+function sysselVal(text, key) {
+  const m = text.match(new RegExp('\\+CSYSSEL:\\s*"' + key + '",[\\s"]*([^\\r\\n"]*)'));
+  return m ? m[1].trim() : '';
+}
+
+// 加载当前锁频配置
+async function loadBand() {
+  // 加载态
+  ['lte-band-cur','nr-band-cur','nsa-band-cur','nrdc-band-cur','w-band-cur','rat-order-cur','nr-disable-cur'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>';
+  });
+  // 两路数据：
+  //  1) AT+CSYSSEL=? → 模块硬件「支持」的频段列表（表格展示）
+  //  2) AT+CSYSSEL="key" → 当前「生效」配置（禁用模式/优先级 + 回填输入框）
+  const [sup, cur] = await Promise.all([
+    sendAT('AT+CSYSSEL=?'),
+    sendAT('AT+CSYSSEL="nr5g_disable";+CSYSSEL="nr5g_band";+CSYSSEL="nsa_nr5g_band";+CSYSSEL="nrdc_nr5g_band";+CSYSSEL="lte_band";+CSYSSEL="w_band";+CSYSSEL="rat_acq_order"')
+  ]);
+  const reset = () => ['lte-band-cur','nr-band-cur','nsa-band-cur','nrdc-band-cur','w-band-cur','rat-order-cur','nr-disable-cur'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '--';
+  });
+  if (/^ERROR/i.test(sup.trim()) || !sup.trim()) { reset(); return; }
+
+  // 表格：显示「支持频段」（来自 AT+CSYSSEL=?）
+  document.getElementById('lte-band-cur').textContent  = sysselVal(sup, 'lte_band') || '--';
+  document.getElementById('nr-band-cur').textContent   = sysselVal(sup, 'nr5g_band') || '--';
+  document.getElementById('nsa-band-cur').textContent  = sysselVal(sup, 'nsa_nr5g_band') || '--';
+  document.getElementById('nrdc-band-cur').textContent = sysselVal(sup, 'nrdc_nr5g_band') || '--';
+  document.getElementById('w-band-cur').textContent    = sysselVal(sup, 'w_band') || '--';
+
+  // 当前生效配置（来自 AT+CSYSSEL="key"）
+  const dis = sysselVal(cur, 'nr5g_disable');
+  const order = sysselVal(cur, 'rat_acq_order');
+  document.getElementById('nr-disable-cur').textContent =
+    ({'0':'允许 SA+NSA','1':'禁用 SA','2':'禁用 NSA'}[dis]) || dis || '--';
+  document.getElementById('rat-order-cur').textContent = order || '--';
+
+  // 回填输入框（当前锁定值，方便在此基础上修改）
+  document.getElementById('lte-band-set').value  = sysselVal(cur, 'lte_band');
+  document.getElementById('nr-band-set').value   = sysselVal(cur, 'nr5g_band');
+  document.getElementById('nsa-band-set').value  = sysselVal(cur, 'nsa_nr5g_band');
+  document.getElementById('nrdc-band-set').value = sysselVal(cur, 'nrdc_nr5g_band');
+  document.getElementById('w-band-set').value    = sysselVal(cur, 'w_band');
+  document.getElementById('rat-order-set').value = sysselVal(cur, 'rat_acq_order');
+  const dsel = document.getElementById('nr-disable-set');
+  if (dis && dsel.querySelector('option[value="' + dis + '"]')) dsel.value = dis;
+}
+
+// 频段组配置表：which → [CSYSSEL key, 输入框 id, 中文标签, 显示前缀(B=4G/WCDMA, n=5G NR)]
+const BAND_MAP = {
+  lte: ['lte_band', 'lte-band-set', 'LTE', 'B'],
+  nr:  ['nr5g_band', 'nr-band-set', 'NR SA', 'n'],
+  nsa: ['nsa_nr5g_band', 'nsa-band-set', 'NR NSA', 'n'],
+  nrdc:['nrdc_nr5g_band', 'nrdc-band-set', 'NRDC', 'n'],
+  w:   ['w_band', 'w-band-set', 'WCDMA', 'B'],
+};
+
+// 设置某个频段（lte/nr/nsa/nrdc/w）
+async function setBand(which) {
+  const [key, id, label] = BAND_MAP[which];
+  const v = document.getElementById(id).value.trim();
+  if (!v) { alert('请输入' + label + '频段，如 1:3:5 或 B1:B3 / n1:n3'); return; }
+  // 归一化：逗号/分号→冒号，去掉 B/n 前缀和空格。
+  // 手册 4.2.19 要求纯数字冒号分隔且不带引号（如 AT+CSYSSEL="nr5g_band",41:78）。
+  const norm = v.replace(/[，,;]/g, ':').replace(/[Bn]/gi, '').replace(/\s+/g, '');
+  if (!/^\d+(:\d+)*$/.test(norm)) { alert('频段格式应为数字冒号分隔，如 1:3:5 或 B1:B3 / n1:n3'); return; }
+  const cmd = 'AT+CSYSSEL="' + key + '",' + norm;
+  const r = await sendAT(cmd);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? '已锁定 ' + label + ' 频段: ' + norm + '\n' + r : '锁定失败，请检查命令/参数：\n' + r);
+  loadBand();
+}
+
+// 设置 RAT 优先级（AT+CSYSSEL="rat_acq_order",12:9:5 → NR:LTE:WCDMA）
+async function setRatOrder() {
+  const v = document.getElementById('rat-order-set').value.trim();
+  if (!v) { alert('请输入优先级，如 12:9:5（NR:LTE:WCDMA）'); return; }
+  const norm = v.replace(/[，,;]/g, ':').replace(/\s+/g, '');
+  if (!/^\d+(:\d+)*$/.test(norm)) { alert('优先级格式应为数字冒号分隔，如 12:9:5'); return; }
+  const r = await sendAT('AT+CSYSSEL="rat_acq_order",' + norm);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? '已设置 RAT 优先级: ' + norm + '（5=WCDMA, 9=LTE, 12=NR5G）\n' + r : '设置失败：\n' + r);
+  loadBand();
+}
+
+// 设置 NR 禁用模式（SA/NSA）
+async function setNRAble() {
+  const d = document.getElementById('nr-disable-set').value;
+  const r = await sendAT('AT+CSYSSEL="nr5g_disable",' + d);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? '已设置 NR 模式: ' + ({'0':'允许 SA+NSA','1':'禁用 SA','2':'禁用 NSA'}[d]) + '\n' + r : '设置失败：\n' + r);
+  loadBand();
+}
+
+// 恢复所有频段默认（执行命令 AT+CSYSSEL）
+async function resetAllBands() {
+  if (!confirm('确定恢复所有频段为默认？尚未设置特定频段时请勿操作。')) return;
+  const r = await sendAT('AT+CSYSSEL');
+  alert('恢复频段结果：\n' + r);
+  loadBand();
+}
+
+// ============ 支持频段查询 + 多选（AT+CSYSSEL=?） ============
+// 手册 AT+CSYSSEL=? 返回各频段组支持列表：
+//   +CSYSSEL: "lte_band",1:2:3:4:...   （部分长行会换行续行）
+// 映射：lte→lte_band, nr→nr5g_band, nsa→nsa_nr5g_band
+let bandPicker = { which: '', full: [] };   // 全局临时状态
+
+function loadSupportedBands(which) {
+  const [key, id, label, prefix] = BAND_MAP[which];
+  const panel = document.getElementById('band-picker');
+  const title = document.getElementById('band-picker-title');
+  const list = document.getElementById('band-picker-list');
+  title.textContent = '支持频段查询中…';
+  panel.style.display = 'block';
+  list.textContent = '查询中…';
+  sendAT('AT+CSYSSEL=?').then(r => {
+    // 合并换行续行：非 +CSYSSEL 开头且非 OK/ERROR 的行接到上一行
+    const rawLines = r.split('\n').map(l => l.replace(/\r$/,'').trim()).filter(l => l && !/^AT/.test(l) && l !== 'OK' && l !== 'ERROR');
+    const joined = [];
+    for (const ln of rawLines) {
+      if (joined.length && !/^\+CSYSSEL/.test(ln)) joined[joined.length-1] += ln;
+      else joined.push(ln);
+    }
+    // 提取目标 key 的频段列表（数字用 : 分隔）
+    const target = joined.find(line => new RegExp('^\\+CSYSSEL:\\s*"' + key + '"', 'i').test(line));
+    if (!target) {
+      title.textContent = label + '：未查询到支持列表';
+      list.textContent = '模块未返回该频段组（' + (r||'').slice(0,100) + '）';
+      return;
+    }
+    // 提取：+CSYSSEL: "<key>",1:2:3:...
+    const m = target.match(/^\+CSYSSEL:\s*"([^"]+)",([\d:]+)/i);
+    const bandStr = m ? m[2] : '';
+    const bands = bandStr.split(':').filter(Boolean);
+    if (!bands.length) { title.textContent = label + '：空列表'; list.textContent = ''; return; }
+    bandPicker.which = which;
+    bandPicker.full = bands;
+    // 回填输入框占位
+    document.getElementById(id).placeholder = '可选 ' + bands.slice(0,4).join(':') + '…';
+    title.textContent = label + ' 支持频段（' + bands.length + ' 个）';
+    list.innerHTML = bands.map(b =>
+      '<label class="band-chip">' +
+      '<input type="checkbox" value="' + b + '" class="band-cb">' + prefix + b +
+      '</label>').join('');
+    // 若已有设定值，勾选
+    const cur = document.getElementById(id).value.trim();
+    if (cur) {
+      const set = new Set(cur.split(':').map(x => x.replace(/[Bn]/i,'').trim()).filter(Boolean));
+      document.querySelectorAll('.band-cb').forEach(cb => { if (set.has(cb.value)) cb.checked = true; });
+    }
+  }).catch(e => { list.textContent = '查询出错：' + e.message; });
+}
+
+function applyBandPicker() {
+  const prefix = BAND_MAP[bandPicker.which][3];
+  const sel = Array.from(document.querySelectorAll('.band-cb:checked')).map(cb => prefix + cb.value);
+  if (!sel.length) { alert('请至少勾选一个频段'); return; }
+  // 写回输入框，再调用 setBand
+  const inputId = BAND_MAP[bandPicker.which][1];
+  document.getElementById(inputId).value = sel.join(':');
+  setBand(bandPicker.which);
+}
+function bandPickAll() { document.querySelectorAll('.band-cb').forEach(cb => cb.checked = true); }
+function bandPickNone() { document.querySelectorAll('.band-cb').forEach(cb => cb.checked = false); }
+
+// 解析 PCI/EARFCN/Band：从 CPSI 输出，按制式区分字段索引（对照手册 4.2.12）。
+//  NR5G_SA : NR5G_SA,OpMode,MCC-MNC,TAC,SCellID,PCellID,FreqBand,earfcn,RSRP,RSRQ,SNR
+//  LTE     : LTE,OpMode,MCC-MNC,TAC,SCellID,PCellID,FreqBand,earfcn,dlbw,ulbw,...
+//  NR5G_NSA: NR5G_NSA,PCellID,FreqBand,earfcn/ssb,RSRP,RSRQ,SNR,scs,NR_dl_bw （无 PLMN）
+//  有 PLMN 时：TAC=m+1, SCellID=m+2, PCellID=m+3, FreqBand=m+4, earfcn=m+5
+function parseCpsiBar(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => /^\+CPSI:/.test(l));
+  if (!lines.length) return null;
+  const findPlmn = (parts) => {
+    for (let i = 1; i < parts.length; i++) if (/^\d{3}-\d{2,3}/.test(parts[i].replace(/"/g, '').trim())) return i;
+    return -1;
+  };
+  const out = { lte: null, nr: null, wcdma: null };
+  for (const line of lines) {
+    const parts = line.replace(/^\+CPSI:\s*/, '').split(',');
+    const mode = (parts[0] || '').trim();
+    const m = findPlmn(parts);
+    if (mode.startsWith('NR5G_NSA')) {
+      out.nr = { mode, plmn: '', pci: parts[1], band: parts[2], earfcn: parts[3] };
+    } else if (mode.startsWith('NR5G_SA')) {
+      if (m < 0) continue;
+      out.nr = { mode, plmn: (parts[m] || '').replace(/"/g, ''), pci: parts[m + 3], band: parts[m + 4], earfcn: parts[m + 5] };
+    } else if (mode.startsWith('LTE')) {
+      if (m < 0) continue;
+      out.lte = { mode, plmn: (parts[m] || '').replace(/"/g, ''), pci: parts[m + 3], band: parts[m + 4], earfcn: parts[m + 5] };
+    } else if (mode.startsWith('WCDMA')) {
+      out.wcdma = { mode, plmn: (m >= 0 ? (parts[m] || '').replace(/"/g, '') : '') };
+    }
+  }
+  // 主 RAT：NR 优先，其次 LTE，其次 WCDMA
+  const main = out.nr || out.lte || out.wcdma || null;
+  return {
+    mode: main ? main.mode : '',
+    plmn: main ? main.plmn : '',
+    pci: main && main.pci !== undefined ? main.pci : '',
+    band: main && main.band !== undefined ? main.band : '',
+    earfcn: main && main.earfcn !== undefined ? main.earfcn : '',
+    lte: out.lte, nr: out.nr, wcdma: out.wcdma
+  };
+}
+
+// 加载当前小区信息
+async function loadCell() {
+  // 加载态
+  ['cell-rat','cell-plmn','cell-pci','cell-earfcn','cell-band'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>';
+  });
+  // 合并成一条批量命令：一次串口往返拿回 CPSI + CCELLCFG? + C5GCELLCFG?。
+  const all = await sendAT('AT+CPSI?;+CCELLCFG?;+C5GCELLCFG?');
+  const cpsi = all;
+  // 无返回 → 还原为占位符
+  if (/^ERROR/i.test(all.trim()) || !all.trim()) {
+    ['cell-rat','cell-plmn','cell-pci','cell-earfcn','cell-band'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = '--';
+    });
+    document.getElementById('cell-lock').textContent = '未锁定';
+    return;
+  }
+  const C = parseCpsiBar(cpsi);
+  // 保存当前小区，供「快速填入锁定框」使用
+  window._curCell = C;
+  document.getElementById('cell-rat').textContent = (C && C.mode) || '--';
+  document.getElementById('cell-plmn').textContent = (C && C.plmn) || '--';
+  document.getElementById('cell-earfcn').textContent = (C && C.earfcn) || '--';
+  document.getElementById('cell-band').textContent = (C && C.band) || '--';
+  document.getElementById('cell-pci').textContent = (C && C.pci) || '--';
+
+  // 检查锁定状态：CPSI/CCELLCFG?/C5GCELLCFG? 都在同一次批量响应里。
+  //   +CCELLCFG?   -> +CCELLCFG: <pci>,<freq>            （未锁定 pci = 0）
+  //   +C5GCELLCFG? -> +C5GCELLCFG: "pci",<pci>,<freq>,…  （未锁定回 +C5GCELLCFG: 0）
+  // 关键：未锁定时模块照样回这一行，所以必须判断「首个参数」而不是「行是否存在」
+  //       （旧代码只看 /\+CCELLCFG:/ 出现与否 → 未锁定也显示"已锁定"）。
+  const lteM = all.match(/\+CCELLCFG:\s*([^,\r\n]+),([^,\r\n]+)/);
+  const ltePci = lteM ? lteM[1].trim().replace(/"/g, '') : '';
+  const lteOk = ltePci !== '' && ltePci !== '0';
+  const nrM = all.match(/\+C5GCELLCFG:\s*([^\r\n]+)/);
+  let nrOk = false;
+  if (nrM) {
+    const nrFirst = nrM[1].split(',')[0].trim().replace(/"/g, '');
+    nrOk = nrFirst !== '' && nrFirst !== '0';
+  }
+  document.getElementById('cell-lock').textContent = lteOk ? 'LTE 已锁定' : (nrOk ? 'NR 已锁定' : '未锁定');
+  if (lteOk) {
+    document.getElementById('lte-pci').value = ltePci;
+    document.getElementById('lte-earfcn').value = lteM[2].trim();
+  }
+}
+
+// 把当前小区信息快速填入锁定框（避免手动抄 PCI/EARFCN/Band）
+function fillLock(rat) {
+  const C = window._curCell;
+  if (!C || !C.pci) { alert('暂无当前小区信息，请先等待刷新或点击「刷新小区」'); return; }
+  // 从 FreqBand 提取纯数字：NR5G_BAND41 → 41；EUTRAN-BAND3 → 3
+  const bandNum = (b) => { const m = (b || '').match(/BAND\s*(\d+)/i); return m ? m[1] : ''; };
+  if (rat === 'lte') {
+    const lte = C.lte;
+    if (!lte || !lte.pci || !lte.earfcn) { alert('当前无 LTE 小区（当前 RAT: ' + (C.mode || '--') + '）'); return; }
+    document.getElementById('lte-pci').value = lte.pci;
+    document.getElementById('lte-earfcn').value = lte.earfcn;
+  } else if (rat === 'nr') {
+    const nr = C.nr;
+    if (!nr || !nr.pci || !nr.earfcn) { alert('当前无 NR 小区（当前 RAT: ' + (C.mode || '--') + '）'); return; }
+    document.getElementById('nr-pci').value = nr.pci;
+    document.getElementById('nr-freq').value = nr.earfcn;
+    document.getElementById('nr-band').value = bandNum(nr.band);
+  }
+}
+
+// 锁 LTE 小区：AT+CCELLCFG=1,<pci>,<earfcn>
+async function lockLte() {
+  const pci = document.getElementById('lte-pci').value.trim();
+  const earfcn = document.getElementById('lte-earfcn').value.trim();
+  if (!pci || !earfcn) { alert('请输入 PCI 和 EARFCN'); return; }
+  if (!confirm('确定锁 LTE 小区 PCI=' + pci + ', EARFCN=' + earfcn + '？立即生效，可能脱网。')) return;
+  const r = await sendAT('AT+CCELLCFG=1,' + pci + ',' + earfcn);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? 'LTE 小区锁定成功：\n' + r : '锁定失败：\n' + r);
+  loadCell();
+}
+
+// 锁 NR 小区：AT+C5GCELLCFG="pci",<pci>,<freq>,<scs>,<band>
+async function lockNr() {
+  const pci = document.getElementById('nr-pci').value.trim();
+  const freq = document.getElementById('nr-freq').value.trim();
+  const scs = document.getElementById('nr-scs').value;
+  const band = document.getElementById('nr-band').value.trim();
+  if (!pci || !freq || !band) { alert('请填写 PCI、FREQ、BAND'); return; }
+  if (!confirm('确定锁 NR 小区？PCI=' + pci + ', FREQ=' + freq + ', SCS=' + scs + ', BAND=' + band + '\n注意：该命令手册标注尚未验证，可能不支持。')) return;
+  const r = await sendAT('AT+C5GCELLCFG="pci",' + pci + ',' + freq + ',' + scs + ',' + band);
+  const ok = /OK/i.test(r) && !/ERROR/i.test(r);
+  alert(ok ? 'NR 小区锁定成功：\n' + r : '锁定失败（或该命令不支持）：\n' + r);
+  loadCell();
+}
+
+// 清除所有小区锁定
+async function unlockCell() {
+  if (!confirm('确定清除所有小区锁定？解锁命令在重启后生效。')) return;
+  // LTE 清除 + NR 清除 并行
+  const [r1, r2] = await Promise.all([sendAT('AT+CCELLCFG=0'), sendAT('AT+C5GCELLCFG="unlock"')]);
+  alert('清除结果：\nLTE: ' + r1 + '\nNR: ' + r2);
+  loadCell();
+}
+
+// 扫描运营商（AT+COPS=? 列出可见运营商/网络，非小区扫描）
+async function scanNetworks() {
+  const box = document.getElementById('scan-result');
+  box.textContent = '扫描中（列表可见运营商），可能需要数十秒…';
+  try {
+    const r = await sendAT('AT+COPS=?');
+    box.textContent = r && !/^ERROR/i.test(r) && r.trim() ? r : '未扫描到结果或模块未返回（' + (r||'').slice(0,80) + '）';
+  } catch (e) {
+    box.textContent = '扫描出错：' + e.message;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadWWAN(); loadAPN(); loadBand(); loadCell(); loadNetMode(); window.__pageRefresh = () => { loadWWAN(); loadCell(); loadNetMode(); }; });
+</script>
+</body>
+</html>

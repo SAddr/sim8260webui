@@ -1,0 +1,17 @@
+[Unit]
+Description=Simcom WebUI Lighttpd Server
+After=network.target ql-netd.service
+Wants=network.target
+
+[Service]
+Type=simple
+# 注意：Type=simple 下不要配置 PIDFile。
+# lighttpd -D 以前台方式运行，由 systemd 直接管理进程。
+ExecStartPre=/opt/sbin/lighttpd -tt -f /usrdata/simcom-webui/systemd/lighttpd.conf
+ExecStart=/opt/sbin/lighttpd -D -f /usrdata/simcom-webui/systemd/lighttpd.conf
+Restart=always
+RestartSec=3
+Environment="PATH=/opt/bin:/opt/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
+
+[Install]
+WantedBy=multi-user.target

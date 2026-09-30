@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>短信 · SIM8260</title>
+  <script src="js/wb-theme.js"></script>
+  <script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-title">SIM8260 Control Center</div>
+      <div class="brand-subtitle">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <a href="index.html" class="nav-tab">总览</a>
+    <a href="signal.html" class="nav-tab">信号</a>
+    <a href="network.html" class="nav-tab">网络</a>
+    <a href="device.html" class="nav-tab">设备</a>
+    <a href="sms.html" class="nav-tab active">短信</a>
+    <a href="atcmd.html" class="nav-tab">AT 命令</a>
+    <a href="settings.html" class="nav-tab">设置</a>
+  </nav>
+  <div class="topbar-foot"><span class="status-pill online"><span class="status-dot"></span>已连接</span></div>
+</header>
+
+<main class="container">
+  <div>
+    <h1 class="page-title">短信中心</h1>
+    <p class="page-subtitle">收件箱，发送与删除短信</p>
+  </div>
+
+  <div class="grid grid-dash">
+    <!-- 收件箱 -->
+    <div class="card col-8">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📥</span> 收件箱</div>
+        <button class="btn btn-sm" onclick="loadSMS()">⟳ 刷新</button>
+      </div>
+      <div id="sms-list">
+        <div style="text-align:center;color:var(--text-muted);padding:20px;">
+          <div class="loading" style="width:24px;height:24px;margin:0 auto 10px;"></div>
+          加载中...
+        </div>
+      </div>
+    </div>
+
+    <!-- 发短信 -->
+    <div class="card col-4">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📤</span> 发送短信</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="font-size:12px;color:var(--text-secondary);">收件人号码</label>
+          <input type="text" class="input" id="sms-num" placeholder="如 13800138000" />
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text-secondary);">短信内容</label>
+          <textarea class="input" id="sms-msg" rows="5" placeholder="输入短信内容..."
+                    style="resize:vertical;" oninput="updateCount()"></textarea>
+          <div style="font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px;">
+            已输入 <span id="sms-count">0</span> 字<span id="sms-enc" style="margin-left:6px;"></span>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="sendSMS()">📤 发送</button>
+        <div id="sms-status" style="font-size:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Powered by @Valor</div>
+</main>
+
+<!-- 短信详情弹窗 -->
+<div class="modal-overlay" id="sms-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">短信详情</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="sms-modal-body"></div>
+  </div>
+</div>
+
+<script>
+// 编码判定（与后端 cgi-bin/sms 的发送策略保持一致）：
+//   纯 ASCII → GSM 7-bit，单条上限 160 字符
+//   含中文/表情 → UCS2，单条上限 70 字符
+function smsIsAscii(s) { return !/[^\x00-\x7F]/.test(s); }
+function smsMaxLen(s) { return smsIsAscii(s) ? 160 : 70; }
+function updateCount() {
+  const v = document.getElementById('sms-msg').value;
+  const max = smsMaxLen(v);
+  const cnt = document.getElementById('sms-count');
+  const enc = document.getElementById('sms-enc');
+  cnt.textContent = v.length + ' / ' + max;
+  cnt.style.color = v.length > max ? 'var(--danger)' : '';
+  if (enc) enc.textContent = v.length ? (smsIsAscii(v) ? '· GSM 7-bit' : '· UCS2 中文') : '';
+}
+
+async function fetchSMS() {
+  const r = await fetch('/cgi-bin/sms?action=list');
+  return await r.text();
+}
+
+// ============================================================
+// PDU 模式短信解析 + 长短信分片重组（GSM 03.40）
+// 后端 sms list 已改用 CMGF=0 输出 +CMGL: <idx>,<stat>,,<len>\n<pduhex>
+// 这里解析 PDU，识别 TP-UDH 中的 concatenated(IEI=00) 信息，
+// 把被拆分的同一条长短信按「引用号」重组为一条。
+// ============================================================
+
+// 16 进制半字节地址解码：OA/DA 地址以 semi-octet(BCD) 存储，
+// 每字节的低 4 位是第一个数字、高 4 位是第二个数字，遇 0xF(15) 填充则跳过。
+// 例："0190F9" -> 10 09 (9) -> "10099"
+function decodeAddrBcd(hex) {
+  let s = '';
+  for (let i = 0; i + 2 <= hex.length; i += 2) {
+    const b = parseInt(hex.substr(i, 2), 16);
+    const lo = b & 0x0F, hi = (b >> 4) & 0x0F;
+    if (lo !== 15) s += lo;
+    if (hi !== 15) s += hi;
+  }
+  return s;
+}
+// SCTS 7字节时间戳：每字节 BCD 编码但两个半字节（nibble）顺序颠倒
+// 解码只需把每字节的两个十六进制字符位置交换即可还原正常顺序。
+// 例：字节 0x62 的两个 nibble 交换后 = "26"（2026 年的后两位）。
+function smsDecodeScts(hex) {
+  if (hex.length < 14) return '';
+  const sw = (h) => h[1] + h[0];   // 交换两个十六进制字符位置
+  const y2 = sw(hex.substr(0,2)), mo = sw(hex.substr(2,2)), d = sw(hex.substr(4,2)),
+        hh = sw(hex.substr(6,2)), mi = sw(hex.substr(8,2)), ss = sw(hex.substr(10,2));
+  // 第 7 字节为时区（BCD 符号+半小时数），此处忽略
+  return y2 + '/' + mo + '/' + d + ' ' + hh + ':' + mi + ':' + ss;
+}
+
+// 解析一条 SMS-DELIVER PDU，返回 {num,time,dcs,is7bit,ref,total,seq,bodyHex}
+function parseSmsPdu(pduHex) {
+  const p = pduHex.toUpperCase();
+  let pos = 0;
+  // 1. SMSC 地址长度（字节）
+  const smscLen = parseInt(p.substr(pos, 2), 16); pos += 2;
+  pos += smscLen * 2; // 跳过 SMSC 地址本身
+  if (p.length - pos < 2) return null;
+  // 2. 首字节 TPDU(从 bits0-1=MTI, bit6=UDHI)
+  const first = parseInt(p.substr(pos, 2), 16); pos += 2;
+  const mti = first & 0x03;
+  const udhi = (first & 0x40) !== 0;
+  // 只处理 SMS-DELIVER(MTI=00)。SMS-STATUS(02)/SUBMIT 忽略或尽量解析
+  // 3. OA 地址
+  let num = '';
+  if (mti === 0) { // SMS-DELIVER
+    const oalen = parseInt(p.substr(pos, 2), 16); pos += 2;   // 地址半字节数(不含TON/NPI)
+    const tonnpi = p.substr(pos, 2); pos += 2;                 // TON/NPI 1字节
+    // 地址字节数 = ceil(oalen/2)。最后一个半字节为 0xF 填充。
+    const addrBytes = Math.ceil(oalen / 2);
+    const addrHex = p.substr(pos, addrBytes * 2); pos += addrBytes * 2;
+    num = decodeAddrBcd(addrHex);   // BCD 半字节反转解码，遇 F 忽略
+    // PID
+    pos += 2;
+    // DCS
+    const dcsHex = p.substr(pos, 2); pos += 2;
+    const dcs = parseInt(dcsHex, 16);
+    // SCTS
+    const scts = smsDecodeScts(p.substr(pos, 14)); pos += 14;
+    // UDL
+    const udl = parseInt(p.substr(pos, 2), 16); pos += 2;
+    let ud = p.substr(pos, udl * 2); // 完整 TP-UD
+    let ref = null, total = null, seq = null, bodyHex = ud;
+    if (udhi && ud.length >= 2) {
+      // 解析 UDH
+      const udhLen = parseInt(ud.substr(0, 2), 16);
+      const ieHex = ud.substr(2, udhLen * 2);
+      bodyHex = ud.substr(2 + udhLen * 2);
+      // 找 IEI=00 (concatenated 8bit)
+      let i = 0;
+      while (i + 4 <= ieHex.length) {
+        const iei = ieHex.substr(i, 2);
+        const iedl = parseInt(ieHex.substr(i + 2, 2), 16);
+        const data = ieHex.substr(i + 4, iedl * 2);
+        if (iei === '00' && iedl >= 3) {
+          ref = parseInt(data.substr(0, 2), 16);
+          total = parseInt(data.substr(2, 2), 16);
+          seq = parseInt(data.substr(4, 2), 16);
+          break;
+        }
+        i += 4 + iedl * 2;
+      }
+    }
+    // GSM 03.38 DCS 判断字母表：
+    //  通用数据编码组(bits7-4=0000, DCS 0x00~0x0F)：bits2-1 决定 00=7bit,01=8bit,10=UCS2,11=保留
+    //  其它编码组(0x10~0x3F 消息类等)：缺省 GSM 7bit
+    const is7bit = (dcs & 0xF0) === 0x00 ? ((dcs & 0x0C) === 0x00) : true;
+    return { num, time: scts, dcs, is7bit, ref, total, seq, bodyHex };
+  }
+  return null;
+}
+
+// 按 dcs 解码正文 hex：UCS2(0x08 或 0x18 等) 每 4hex=1字符；7bit 需解压
+function smsDecodeBody(bodyHex, is7bit, dcs) {
+  if (!bodyHex) return '';
+  if (!is7bit) {
+    // UCS2 / 8bit：每 4 hex = 1 字符（UCS2-16）
+    let out = '';
+    for (let i = 0; i + 4 <= bodyHex.length; i += 4) {
+      out += String.fromCodePoint(parseInt(bodyHex.substr(i, 4), 16));
+    }
+    return out;
+  }
+  // GSM 7bit：按 GSM 03.38 解压（每 8 字节存 7 个 7-bit 字符，低位先行）
+  const bytes = [];
+  for (let i = 2; i < bodyHex.length; i += 2) bytes.push(parseInt(bodyHex.substr(i - 2, 2), 16));
+  return smsDecode72bit(bytes);
+}
+function smsDecode72bit(bytes) {
+  const GSM = "@{{{{{*@@@@@@}(|_{^^}~~~~`@@@@@@@@@@@@@@@@@...}@@@@@@@@@@@@!!!...";
+  // 简化：标准 GSM 7bit 字母表，直接按位拼
+  let bits = '';
+  for (const b of bytes) bits += b.toString(2).padStart(8, '0');
+  // LSB-first: 需反转每字节位序
+  let lsb = '';
+  for (const b of bytes) lsb += Array.from(b.toString(2).padStart(8,'0')).reverse().join('');
+  let out = '';
+  for (let i = 0; i + 7 <= lsb.length; i += 7) {
+    const v = parseInt(lsb.substr(i, 7), 2);
+    if (v === 0x00) continue; // 填充 0 结尾前终止
+    out += gsm7Char(v);
+  }
+  return out;
+}
+function gsm7Char(v) {
+  const map = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\x1bÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
+  return map[v] || '';
+}
+
+// 把后端返回的 PDU 文本解析为条目数组
+function parseSmsList(raw) {
+  const lines = raw.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(Boolean);
+  const rawParts = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\+CMGL:\s*(\d+),(\d+.*?)$/);
+    if (m) {
+      const idx = m[1];
+      // PDU 在下一行（或连着）；收集直到下一个 +CMGL 或文件尾
+      let pdu = '';
+      for (let j = i + 1; j < lines.length; j++) {
+        if (/^\+CMGL:/.test(lines[j])) break;
+        if (/^[0-9a-fA-F]+$/.test(lines[j])) { pdu += lines[j]; }
+      }
+      rawParts.push({ index: idx, statRaw: m[2], pdu });
+    }
+  }
+  // 解析每条
+  return rawParts.map(r => {
+    const parsed = r.pdu ? parseSmsPdu(r.pdu) : null;
+    if (!parsed) return null;
+    const statNum = parseInt(r.statRaw, 10);
+    return Object.assign({ index: r.index, stat: isNaN(statNum) ? r.statRaw : String(statNum), unread: statNum === 0 }, parsed);
+  }).filter(Boolean);
+}
+
+// 重组分片：按 num+ref 分组，段号排序，拼接 bodyHex 后整体解码
+function reassembleSmsParts(parts) {
+  const final = [];
+  const groups = {};
+  const singles = [];
+  for (const p of parts) {
+    if (p.ref != null && p.total > 1) {
+      const key = p.num + '|' + p.ref;
+      groups[key] = groups[key] || [];
+      groups[key].push(p);
+    } else {
+      singles.push(p);
+    }
+  }
+  for (const key in groups) {
+    const g = groups[key];
+    // 必须集齐全部段才合并
+    if (g.length >= Math.max(...g.map(x=>x.total))) {
+      g.sort((a,b) => a.seq - b.seq);
+      const first = g[0];
+      const allBody = g.map(x => x.bodyHex).join('');
+      final.push({
+        index: g.map(x=>x.index).join(','),
+        num: first.num,
+        time: first.time,
+        stat: first.stat,
+        unread: first.unread,
+        text: smsDecodeBody(allBody, first.is7bit, first.dcs)
+      });
+    } else {
+      // 段不完整，逐条显示原始（不合并）
+      for (const x of g) final.push({ index: x.index, num: x.num, time: x.time, stat: x.stat, unread: x.unread, text: x.bodyHex });
+    }
+  }
+  for (const s of singles) {
+    final.push({ index: s.index, num: s.num, time: s.time, stat: s.stat, unread: s.unread, text: smsDecodeBody(s.bodyHex, s.is7bit, s.dcs) });
+  }
+  // 按首段 index 稳定排序
+  final.sort((a,b) => parseInt(a.index) - parseInt(b.index));
+  return final;
+}
+
+// 文本模式回退解析（旧格式，后端如回到 CMGF=1 时使用）
+function parseSmsListText(raw) {
+  const lines = raw.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+  const msgs = [];
+  let current = null;
+  for (const line of lines) {
+    if (line.startsWith('+CMGL:')) {
+      if (current) { current.text = decodeSmsText(current.text); msgs.push(current); }
+      const body = line.replace('+CMGL:', '');
+      const parts = body.split(',');
+      current = { index: parts[0].trim(), stat: (parts[1]||'').replace(/"/g,'').trim(), num: (parts[2]||'').replace(/"/g,'').trim(), time: (parts[4]||'').replace(/"/g,'').trim(), text: '' };
+    } else if (current && !line.startsWith('+CMGL:') && line !== 'OK' && line !== 'ERROR') {
+      current.text += (current.text ? ' ' : '') + line;
+    }
+  }
+  if (current) { current.text = decodeSmsText(current.text); msgs.push(current); }
+  return msgs;
+}
+
+async function loadSMS() {
+  const el = document.getElementById('sms-list');
+  el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;"><div class="loading" style="width:24px;height:24px;margin:0 auto 10px;"></div>加载中...</div>';
+  const text = await fetchSMS();
+  // 识别后端输出是 PDU 模式还是文本模式
+  const isPdu = /^\+CMGL:\s*\d+,\d/.test(text.trim());
+  let msgs;
+  if (isPdu) {
+    // ---- PDU 模式：解析分片并重组（同一引用号的多条合并成一条完整短信）----
+    const parts = parseSmsList(text);
+    msgs = reassembleSmsParts(parts);
+  } else {
+    // ---- 文本模式（旧/异常回退）----
+    msgs = parseSmsListText(text);
+  }
+
+  if (msgs.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:30px;">暂无短信</div>';
+    return;
+  }
+
+  // 渲染
+  // 注意：绝不要在 onclick 属性里内联拼接短信正文/号码 —— 正文可能含双引号、
+  // 换行、</div> 等，转义不当时会提前截断属性（旧 bug：合并短信点了没反应）。
+  // 改为用 data-* 携带数组下标 + 渲染后 addEventListener 绑定，彻底规避转义。
+  window.__smsMsgs = msgs;
+  let html = '';
+  for (let mi = 0; mi < msgs.length; mi++) {
+    const m = msgs[mi];
+    // PDU 模式 stat: 0=未读 1=已读；文本模式: "REC UNREAD"等
+    const isUnread = m.stat === '0' || (/UNREAD/i.test(m.stat||''));
+    // 合并短信：index 含逗号，内容已在本地产出，无需再向后端单条读取
+    const isMerged = String(m.index).indexOf(',') !== -1;
+    const clickAttr = isMerged
+      ? 'data-merged="' + mi + '"'
+      : 'data-idx="' + escapeHtml(String(m.index)) + '"';
+    html += `
+      <div style="display:flex;gap:12px;align-items:center;padding:12px;border-radius:var(--radius-md);
+                  background:${isUnread?'rgba(56,189,248,0.08)':'rgba(15,23,42,0.4)'};
+                  border:1px solid var(--border-color);margin-bottom:8px;">
+        <div style="flex:1;cursor:pointer;" ${clickAttr}>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:600;font-size:14px;">${isUnread?'<span style="color:var(--accent-primary);">●</span> ':''}${escapeHtml(m.num||'未知号码')}</span>
+            <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(m.time)}</span>
+          </div>
+          <div data-i18n-skip style="color:var(--text-secondary);font-size:13px;margin-top:4px;white-space:normal;word-break:break-all;line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;">
+            ${escapeHtmlMultiline(m.text||'(空)')}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:11px;color:var(--text-muted);">${isMerged?'合并':''}#${m.index}</span>
+          <button class="btn btn-sm btn-danger" onclick="delSMS('${m.index}',event)">删除</button>
+        </div>
+      </div>`;
+  }
+  el.innerHTML = html;
+  // 事件绑定：单条短信走后端读取；合并短信直接用本地重组好的正文展示
+  el.querySelectorAll('[data-merged]').forEach(node => {
+    node.addEventListener('click', () => {
+      const m = window.__smsMsgs[parseInt(node.getAttribute('data-merged'), 10)];
+      if (m) viewMerged(m.text, m.num, m.time);
+    });
+  });
+  el.querySelectorAll('[data-idx]').forEach(node => {
+    node.addEventListener('click', () => viewSMS(node.getAttribute('data-idx')));
+  });
+}
+
+async function viewSMS(index) {
+  const r = await fetch('/cgi-bin/sms?action=read&index=' + encodeURIComponent(index));
+  const text = await r.text();
+  const lines = text.split('\n').map(l=>l.replace(/\r$/, '').trim()).filter(Boolean);
+  let num='', time='', stat='', content='';
+  // PDU 模式：+CMGR: <stat>,<len> 或 <stat>,<len>；pdu 在下方 hex 行
+  const pduLine = lines.find(l => /^[0-9a-fA-F]+$/.test(l) && l.length >= 20);
+  if (pduLine) {
+    const parsed = parseSmsPdu(pduLine);
+    if (parsed) {
+      num = parsed.num;
+      time = parsed.time;
+      content = smsDecodeBody(parsed.bodyHex, parsed.is7bit, parsed.dcs);
+      const cmgrH = lines.find(l => l.startsWith('+CMGR'));
+      stat = cmgrH ? (cmgrH.split(',')[0].replace('+CMGR:', '').trim()) : '';
+    }
+  } else {
+    // 文本模式回退
+    const header = lines.find(l=>l.startsWith('+CMGR'));
+    if (header) {
+      const p = header.replace('+CMGR', '').replace(':','').trim().split(',');
+      stat = (p[0]||'').replace(/"/g,'');
+      num = (p[1]||'').replace(/"/g,'');
+      time = (p[3]||'').replace(/"/g,'');
+    }
+    const contentLines = lines.filter(l=>!l.startsWith('+CMGR') && l!=='OK' && l!=='ERROR');
+    content = decodeSmsText(contentLines.join(' '));
+  }
+  document.getElementById('sms-modal-body').innerHTML = `
+    <table class="info-table">
+      <tr><td>状态</td><td>${escapeHtml(stat==='0'?'未读':stat==='1'?'已读':stat)}</td></tr>
+      <tr><td>号码</td><td>${escapeHtml(num)}</td></tr>
+      <tr><td>时间</td><td>${escapeHtml(time)}</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div data-i18n-skip style="color:var(--text-primary);font-size:14px;line-height:1.7;word-break:break-word;white-space:normal;">${escapeHtmlMultiline(content)}</div>`;
+  document.getElementById('sms-modal').classList.add('open');
+}
+
+// 合并后的长短信（分片已重组为一条），本地产出数据直接展示，无需后端单条读取。
+// 入参 text 是未转义的原始正文，这里统一做 HTML 转义 + 换行处理。
+function viewMerged(text, num, time) {
+  document.getElementById('sms-modal-body').innerHTML = `
+    <table class="info-table">
+      <tr><td>类型</td><td>长短信（分片已自动合并）</td></tr>
+      <tr><td>号码</td><td>${escapeHtml(num)}</td></tr>
+      <tr><td>时间</td><td>${escapeHtml(time)}</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div data-i18n-skip style="color:var(--text-primary);font-size:14px;line-height:1.7;word-break:break-word;white-space:normal;">${escapeHtmlMultiline(text||'(空)')}</div>`;
+  document.getElementById('sms-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('sms-modal').classList.remove('open'); }
+
+async function sendSMS() {
+  const num = document.getElementById('sms-num').value.trim();
+  const msg = document.getElementById('sms-msg').value.trim();
+  const status = document.getElementById('sms-status');
+  if (!num) { status.innerHTML = '<span style="color:var(--danger)">请输入收件人号码</span>'; return; }
+  if (!msg) { status.innerHTML = '<span style="color:var(--danger)">请输入短信内容</span>'; return; }
+  const max = smsMaxLen(msg);
+  if (msg.length > max) {
+    status.innerHTML = '<span style="color:var(--danger)">内容过长：' +
+      (smsIsAscii(msg) ? '纯英文/数字单条上限 160 字符' : '含中文/表情单条上限 70 字符') +
+      '，当前 ' + msg.length + ' 字符</span>';
+    return;
+  }
+  status.innerHTML = '<span style="color:var(--text-secondary)"><span class="loading"></span> 发送中...</span>';
+  const r = await fetch('/cgi-bin/sms?action=send&num=' + encodeURIComponent(num) + '&msg=' + encodeURIComponent(msg));
+  const res = await r.text();
+  if (res.includes('OK')) {
+    status.innerHTML = '<span style="color:var(--success)">✅ 发送成功</span>';
+    document.getElementById('sms-msg').value = '';
+    updateCount();
+  } else {
+    status.innerHTML = '<span style="color:var(--danger)">❌ 发送失败：' + escapeHtml(res.replace(/\n/g,' ')) + '</span>';
+  }
+}
+
+async function delSMS(index, ev) {
+  ev.stopPropagation();
+  if (!confirm('确定删除短信 #' + index + ' 吗？')) return;
+  // 合并短信 index 形如 "1,2,3"，需逐片删除
+  const indexes = String(index).split(',').map(s=>s.trim()).filter(Boolean);
+  const results = [];
+  for (const i of indexes) {
+    const r = await fetch('/cgi-bin/sms?action=del&index=' + encodeURIComponent(i));
+    results.push(await r.text());
+  }
+  const allOk = results.every(res => res.includes('OK'));
+  alert(allOk ? '删除成功' : '删除结果：' + results.join(' / '));
+  loadSMS();
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// 多行文本安全输出：先转义 HTML，再把换行转 <br>，保证长短信/多段正文在弹窗里正确换行显示
+function escapeHtmlMultiline(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+                       .replace(/\r\n/g,'<br>').replace(/\n/g,'<br>').replace(/\r/g,'<br>');
+}
+
+// 文本模式回退解码（CMGF=1 / 后端回明文时使用）。
+// 主路径是 PDU（由 smsDecodeBody 解码），本函数仅服务旧回退分支；
+// 之前这里被调用却没有定义，回退路径会抛 ReferenceError 导致列表空白。
+function decodeSmsText(s) {
+  let t = String(s == null ? '' : s);
+  // 还原常见的转义序列（部分后端/串口会把控制字符转义后再回传）
+  t = t.replace(/\\r\\n|\\n|\\r/g, '\n')
+       .replace(/\\t/g, '\t')
+       .replace(/\\x([0-9a-fA-F]{2})/g, (m,h) => String.fromCharCode(parseInt(h,16)))
+       .replace(/\\u([0-9a-fA-F]{4})/g, (m,h) => String.fromCharCode(parseInt(h,16)))
+       .replace(/\\\\/g, '\\');
+  return t.trim();
+}
+
+document.addEventListener('DOMContentLoaded', () => { loadSMS(); window.__pageRefresh = loadSMS; });
+</script>
+</body>
+</html>

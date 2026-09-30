@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>信号详情 · SIM8260</title>
+  <script src="js/wb-theme.js"></script>
+  <script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-title">SIM8260 Control Center</div>
+      <div class="brand-subtitle">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <a href="index.html" class="nav-tab">总览</a>
+    <a href="signal.html" class="nav-tab active">信号</a>
+    <a href="network.html" class="nav-tab">网络</a>
+    <a href="device.html" class="nav-tab">设备</a>
+    <a href="sms.html" class="nav-tab">短信</a>
+    <a href="atcmd.html" class="nav-tab">AT 命令</a>
+    <a href="settings.html" class="nav-tab">设置</a>
+  </nav>
+  <div class="topbar-foot">
+    <span class="status-pill online"><span class="status-dot"></span>已连接</span>
+  </div>
+</header>
+
+<main class="container">
+  <div>
+    <h1 class="page-title">信号详情</h1>
+    <p class="page-subtitle">实时监测当前制式信号质量与各天线状态</p>
+    <p class="page-subtitle" style="color:var(--accent);margin-top:4px;">📶 连接方式：<span id="ca-status">检测中…</span></p>
+  </div>
+
+  <!-- 信号质量（合并）+ 网络与小区 -->
+  <div class="grid grid-dash">
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📶</span> 信号质量</div>
+        <span class="status-pill online" id="sig-pill"><span class="status-dot"></span><span id="sig-rat">检测中</span></span>
+      </div>
+      <div class="signal-ring-wrap">
+        <div class="signal-ring">
+          <svg viewBox="0 0 120 120">
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="50%" stop-color="#818cf8" />
+                <stop offset="100%" stop-color="#c084fc" />
+              </linearGradient>
+            </defs>
+            <circle class="signal-ring-bg" cx="60" cy="60" r="52"></circle>
+            <g class="signal-ring-ticks">
+              <line x1="60" y1="4" x2="60" y2="10" />
+              <line x1="113" y1="33" x2="108" y2="37" />
+              <line x1="116" y1="60" x2="110" y2="60" />
+              <line x1="113" y1="87" x2="108" y2="83" />
+              <line x1="60" y1="116" x2="60" y2="110" />
+              <line x1="7" y1="87" x2="12" y2="83" />
+              <line x1="4" y1="60" x2="10" y2="60" />
+              <line x1="7" y1="33" x2="12" y2="37" />
+            </g>
+            <circle cx="60" cy="60" r="52" fill="none" stroke="url(#ringGrad)" stroke-width="6" stroke-linecap="round"
+                    stroke-dasharray="0 326.7" id="sig-ring"></circle>
+          </svg>
+          <div class="signal-ring-text">
+            <div class="num" id="sig-main">--</div>
+            <div class="lbl" id="sig-main-lbl">SINR (dB)</div>
+          </div>
+        </div>
+        <div class="signal-detail" id="sig-detail"></div>
+      </div>
+      <!-- NSA 双连接时的 LTE 锚点信息 -->
+      <div id="nsa-lte-wrap" style="display:none;margin-top:12px;"></div>
+    </div>
+
+    <!-- 网络与小区（移到原 4G LTE 信号块位置） -->
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🌐</span> 网络与小区</div>
+        <div class="card-action" onclick="refreshSig()">⟳ 刷新</div>
+      </div>
+      <table class="info-table">
+        <tr><td>网络制式</td><td id="nc-rat">--</td></tr>
+        <tr><td>运营商 PLMN</td><td id="nc-plmn">--</td></tr>
+        <tr><td>TAC / LAC</td><td id="nc-tac">--</td></tr>
+        <tr><td>小区 ID</td><td id="nc-cellid">--</td></tr>
+        <tr><td>PCI / PSC</td><td id="nc-pci">--</td></tr>
+        <tr><td>频段</td><td id="nc-band">--</td></tr>
+        <tr><td>频点</td><td id="nc-earfcn">--</td></tr>
+        <tr><td>载波聚合</td><td id="nc-ca">--</td></tr>
+      </table>
+      <div class="divider"></div>
+      <details>
+        <summary style="cursor:pointer;font-size:13px;color:var(--accent);">📄 原始应答（CPSI / CRSSI / CNWINFO）点击展开</summary>
+        <pre id="nc-raw" style="font-size:11px;color:var(--text-secondary);background:var(--bg-elevated,#0d1117);padding:10px;border-radius:8px;overflow:auto;max-height:240px;white-space:pre-wrap;margin-top:8px;">--</pre>
+      </details>
+    </div>
+  </div>
+
+  <!-- NR 各天线 -->
+  <div class="card" style="margin-top:20px;" id="nr-ant-card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">📡</span> NR 各天线 RSSI (4×4 MIMO)</div>
+      <div class="card-action" onclick="refreshSig()">⟳ 立即刷新</div>
+    </div>
+    <div class="antennas" style="grid-template-columns:repeat(4,1fr);">
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-nr0" style="height:0%"></div></div><div class="val" id="v-nr0">--</div><div class="name">PRX0 (主)</div></div>
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-nr1" style="height:0%"></div></div><div class="val" id="v-nr1">--</div><div class="name">DRX1</div></div>
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-nr2" style="height:0%"></div></div><div class="val" id="v-nr2">--</div><div class="name">DRX2</div></div>
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-nr3" style="height:0%"></div></div><div class="val" id="v-nr3">--</div><div class="name">DRX3</div></div>
+    </div>
+  </div>
+
+  <!-- LTE 各天线 -->
+  <div class="card" style="margin-top:20px;" id="lte-ant-card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">📡</span> LTE 各天线 RSSI</div>
+    </div>
+    <div class="antennas" style="grid-template-columns:repeat(4,1fr);">
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-lte0" style="height:0%"></div></div><div class="val" id="v-lte0">--</div><div class="name">PRX0 (主)</div></div>
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-lte1" style="height:0%"></div></div><div class="val" id="v-lte1">--</div><div class="name">DRX1</div></div>
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-lte2" style="height:0%"></div></div><div class="val" id="v-lte2">--</div><div class="name">DRX2</div></div>
+      <div class="antenna-bar"><div class="bar"><div class="bar-fill" id="ant-lte3" style="height:0%"></div></div><div class="val" id="v-lte3">--</div><div class="name">DRX3</div></div>
+    </div>
+  </div>
+
+  <!-- 链路速率估算（基于空口参数的理论值） -->
+  <div class="card" style="margin-top:20px;" id="rate-card">
+    <div class="card-header">
+      <div class="card-title"><span class="icon">🚀</span> 链路速率估算</div>
+      <div class="card-action" onclick="refreshSig()">⟳ 立即刷新</div>
+    </div>
+    <table class="info-table">
+      <tr><td>载波带宽</td><td id="rt-bw">--</td></tr>
+      <tr><td>下行调制</td><td id="rt-dlmod">--</td></tr>
+      <tr><td>上行调制</td><td id="rt-ulmod">--</td></tr>
+      <tr><td>下行流数</td><td id="rt-layers">--</td></tr>
+      <tr><td>频谱效率</td><td id="rt-eff">--</td></tr>
+      <tr><td>估算下行</td><td id="rt-dl" style="font-weight:600;color:var(--accent);">--</td></tr>
+      <tr><td>估算上行</td><td id="rt-ul" style="font-weight:600;">--</td></tr>
+    </table>
+    <div class="divider"></div>
+    <div id="rt-note" style="font-size:12px;color:var(--text-secondary);line-height:1.7;"></div>
+  </div>
+
+  <div class="footer">Powered by @Valor</div>
+</main>
+
+<script>
+async function sendAT(cmd) {
+  const r = await fetch('/cgi-bin/atcmd?cmd=' + encodeURIComponent(cmd));
+  return await r.text();
+}
+
+// ===== 工具函数 =====
+function signalPct(dBm) {
+  if (dBm >= -40) return 100;
+  if (dBm <= -140) return 0;
+  return Math.round((dBm + 140) * 100 / 100);
+}
+function sinrPct(s) {
+  if (s >= 30) return 100;
+  if (s <= -10) return 0;
+  return Math.round((s + 10) * 100 / 40);
+}
+// RSCP（WCDMA 接收功率）映射：-70 好，-110 差
+function rscpPct(r) {
+  if (r >= -70) return 100;
+  if (r <= -110) return 0;
+  return Math.round((r + 110) * 100 / 40);
+}
+
+// 信号质量评级（综合 RSRP 与 SINR；WCDMA 传 RSCP）
+function gradeSignal(rsrp, sinr) {
+  if (rsrp === undefined || isNaN(rsrp)) return { t: '--', c: 'var(--text-muted)', bg: 'transparent' };
+  const s = rsrp >= -80 ? 4 : rsrp >= -95 ? 3 : rsrp >= -110 ? 2 : 1;
+  const n = (sinr === undefined || isNaN(sinr)) ? 4 : (sinr >= 20 ? 4 : sinr >= 10 ? 3 : sinr >= 0 ? 2 : 1);
+  const score = Math.min(s, n);
+  if (score >= 4) return { t: '优秀', c: '#4ade80', bg: 'rgba(74,222,128,0.15)' };
+  if (score === 3) return { t: '良好', c: '#a3e635', bg: 'rgba(163,230,53,0.15)' };
+  if (score === 2) return { t: '一般', c: '#fbbf24', bg: 'rgba(251,191,36,0.15)' };
+  return { t: '差', c: '#f87171', bg: 'rgba(248,113,113,0.15)' };
+}
+function gradeHtml(rsrp, sinr) {
+  const g = gradeSignal(rsrp, sinr);
+  return `<span style="display:inline-block;padding:1px 8px;border-radius:9px;font-size:11px;line-height:1.35;font-weight:600;color:${g.c};background:${g.bg};">${g.t}</span>`;
+}
+function setRing(id, pct) {
+  const c = 2 * Math.PI * 52;
+  document.getElementById(id).setAttribute('stroke-dasharray', Math.round(c * pct / 100) + ' ' + c);
+}
+
+const LTE_BW = ['1.4MHz','3MHz','5MHz','10MHz','15MHz','20MHz'];
+const NR_BW = ['5MHz','10MHz','15MHz','20MHz','25MHz','30MHz','35MHz','40MHz','45MHz','50MHz','60MHz','70MHz','80MHz','90MHz','100MHz','200MHz','400MHz'];
+function bandLabel(b) {
+  if (!b) return '--';
+  const m = b.match(/BAND(\d+)/i);
+  if (/NR5G/i.test(b)) return m ? ('n' + m[1]) : b;
+  if (/EUTRAN/i.test(b)) return m ? ('B' + m[1]) : b;
+  if (/IMT 2000/i.test(b)) return 'B1 (2100)';
+  if (/IMT 800/i.test(b)) return 'B19 (800)';
+  return b;
+}
+
+// =====================================================================
+// 链路速率估算（空口理论值）
+// 数据源：AT+CPSI?（制式/带宽/RSRP/SNR） + AT+CNWINFO?（调制/带宽）
+// 两者已在 refreshSig 的同一条合并命令里返回，无需额外 AT 查询。
+//
+// 计算模型（3GPP 资源块）：
+//   速率 = PRB数 × 12子载波 × 符号数/秒 × (1-开销) × 频谱效率 × 层数 × 时隙方向占比 × MAC效率
+// =====================================================================
+
+// 调制阶数 → 每符号比特数
+const MOD_BITS = { QPSK: 2, '16QAM': 4, '64QAM': 6, '256QAM': 8 };
+// 调制阶数 → 可用码率区间 [弱信号, 强信号]（3GPP MCS 表的实际调度取值，非理论上限）
+const MOD_CR   = {
+  QPSK:   [0.25, 0.50],
+  '16QAM':[0.35, 0.62],
+  '64QAM':[0.45, 0.75],
+  '256QAM':[0.55, 0.88]
+};
+// 带宽(MHz) → PRB 数
+const NR_PRB  = {5:11,10:24,15:38,20:51,25:65,30:78,40:106,50:133,60:162,70:189,80:217,90:245,100:273};
+const LTE_PRB = {1.4:6, 3:15, 5:25, 10:50, 15:75, 20:100};
+// NR 频段 → 子载波间隔对应的 OFDM 符号数/秒
+//   30kHz SCS：1ms 子帧含 2 时隙 × 14 符号 = 28000 符号/秒
+//   15kHz SCS：1ms 子帧含 1 时隙 × 14 符号 = 14000 符号/秒
+const NR_SCS30_BANDS = [41, 48, 77, 78, 79, 257, 258, 260, 261];
+// TDD 频段（下行/上行按时隙分配，不能占满）
+const NR_TDD_BANDS   = [38, 39, 40, 41, 48, 77, 78, 79, 257, 258, 260, 261];
+
+// 提取频段号。必须先匹配 "BAND" 后面的数字 —— 直接抓首个数字会把
+// "NR5G_BAND78" 里 NR**5**G 的 5 当成频段号（n78 会被误判成 n5，
+// 进而 Sub-Carrier Spacing 与时分双工判定全错）。
+function bandNumOf(b) {
+  const s = String(b || '');
+  const m = s.match(/BAND(\d+)/i);
+  if (m) return parseInt(m[1], 10);
+  const m2 = s.match(/(\d+)/);
+  return m2 ? parseInt(m2[1], 10) : NaN;
+}
+function isTddBand(b, isNR) {
+  const n = bandNumOf(b);
+  if (isNaN(n)) return false;
+  if (isNR) return NR_TDD_BANDS.indexOf(n) >= 0;
+  return n >= 33 && n <= 48;            // LTE TDD: B33~B48
+}
+
+// 解析 CNWINFO：提取调制与带宽。
+// LTE 与 NR 的字段位置不同（LTE 调制在第 6/7 位，NR 在第 8/9 位），
+// 所以**按值匹配**而不是按索引，避免固件改版后错位。
+function parseCnwinfoAll(text) {
+  const out = { lte: null, nr: null };
+  const lines = text.split('\n').map(l => l.replace(/\r$/, '').trim())
+                    .filter(l => /^\+CNWINFO:/i.test(l));
+  for (const line of lines) {
+    const parts = line.replace(/^\+CNWINFO:\s*/i, '').split(',');
+    const rat = (parts[0] || '').trim();
+    const mods = [];
+    let bwMHz = NaN;
+    for (let i = 1; i < parts.length; i++) {
+      const f = parts[i].trim();
+      const mb = f.match(/^(\d+)\s*M$/i);          // 形如 "100M"
+      if (mb) { bwMHz = parseInt(mb[1], 10); continue; }
+      if (/^(QPSK|16QAM|64QAM|256QAM)$/i.test(f)) { mods.push(f.toUpperCase()); continue; }
+    }
+    const rec = { rat, ulMod: mods[0] || '', dlMod: mods[1] || mods[0] || '', bwMHz };
+    if (/^NR5G/i.test(rat)) out.nr = rec;
+    else if (/^LTE/i.test(rat)) out.lte = rec;
+  }
+  return out;
+}
+
+// 下行流数（MIMO 层数 / RI）。
+// AT 指令无法读取 RI，只能按 RSRP + SNR 推断 —— 这是估算中不确定性最大的一项。
+function estLayers(rsrp, snr, isNR) {
+  const r = isNaN(rsrp) ? -120 : rsrp;
+  const s = isNaN(snr) ? 0 : snr;
+  if (isNR) {
+    if (r >= -80 && s >= 22) return 4;
+    if (r >= -88 && s >= 16) return 3;
+    if (r >= -100 && s >= 6) return 2;
+    if (r >= -110) return 1;
+    return 1;
+  }
+  // LTE：2x2 最常见，4x4 需极好信道
+  if (r >= -85 && s >= 18) return 4;
+  if (r >= -90 && s >= 12) return 2;
+  if (r >= -105 && s >= 3) return 2;
+  return 1;
+}
+
+// 按 SNR 在调制码率区间内插值；SNR 未知时直接返回整个区间（供显示范围用）
+function crOf(mod, snr) {
+  const r = MOD_CR[mod];
+  if (!r) return null;
+  if (isNaN(snr)) return r;
+  let t = (snr + 5) / 33;                 // -5dB → 0，28dB → 1
+  t = Math.max(0, Math.min(1, t));
+  const cr = r[0] + t * (r[1] - r[0]);
+  return [cr, cr];
+}
+
+// 估算单条链路（NR 或 LTE）的速率区间，单位 Mbps
+function estLinkRate(o) {
+  const isNR = o.isNR;
+  const bw = o.bwMHz;
+  const prb = isNR ? (NR_PRB[bw] || 0) : (LTE_PRB[bw] || 0);
+  if (!prb) return null;
+
+  const n = bandNumOf(o.band);
+  const symPerSec = isNR ? (NR_SCS30_BANDS.indexOf(n) >= 0 ? 28000 : 14000) : 14000;
+  const tdd = isTddBand(o.band, isNR);
+  // TDD 常见 7:3（NR）/ 6:2（LTE）；FDD 上下行各占满
+  const dlRatio = tdd ? (isNR ? 0.73 : 0.70) : 1.0;
+  const ulRatio = tdd ? (isNR ? 0.25 : 0.28) : 1.0;
+  // 开销：PDCCH / DMRS / CSI-RS / SSB / PBCH
+  const ohDl = isNR ? 0.14 : 0.25;
+  const ohUl = isNR ? 0.08 : 0.15;
+  const MAC = 0.85;                       // MAC/RLC 与调度损失
+
+  const layers = estLayers(o.rsrp, o.snr, isNR);
+
+  const reDL = prb * 12 * symPerSec * (1 - ohDl);
+  const reUL = prb * 12 * symPerSec * (1 - ohUl);
+
+  const calc = (mod, re, ratio, mulLayers) => {
+    if (!mod || !MOD_BITS[mod]) return null;
+    const cr = crOf(mod, o.snr);
+    if (!cr) return null;
+    const bits = MOD_BITS[mod];
+    return {
+      low:  re * (bits * cr[0]) * mulLayers * ratio * MAC / 1e6,
+      high: re * (bits * cr[1]) * mulLayers * ratio * MAC / 1e6,
+      effLow: bits * cr[0], effHigh: bits * cr[1]
+    };
+  };
+
+  // 下行按推断层数；上行 UE 发射功率受限，通常 rank 1
+  const dl = calc(o.dlMod, reDL, dlRatio, layers);
+  const ul = calc(o.ulMod, reUL, ulRatio, 1);
+
+  return { prb, layers, tdd, dl, ul };
+}
+
+function fmtRange(r) {
+  if (!r) return '--';
+  const a = Math.round(r.low), b = Math.round(r.high);
+  if (a === b) return a + ' Mbps';
+  return a + ' ~ ' + b + ' Mbps';
+}
+// 动态拼接出来的文案（如 "NR 2 层"）整体不在词典里，DOM 扫描命中不了，
+// 直接调 i18n 的翻译函数；i18n 未加载时原样返回中文。
+function wbT(s) {
+  try { return (window.wbI18n && window.wbI18n.t) ? window.wbI18n.t(s) : s; }
+  catch (e) { return s; }
+}
+// CPSI 的 dlbw 是带宽索引，转成 MHz
+function bwMHzFromIdx(isNR, idx) {
+  if (idx === undefined || isNaN(idx)) return NaN;
+  const s = isNR ? NR_BW[idx] : LTE_BW[idx];
+  if (!s) return NaN;
+  const m = String(s).match(/([\d.]+)/);
+  return m ? parseFloat(m[1]) : NaN;
+}
+function bwTxtOf(v) {
+  if (v === undefined || isNaN(v)) return '--';
+  return (String(v).indexOf('.') >= 0 ? v.toFixed(1) : v) + ' MHz';
+}
+
+// 渲染「链路速率估算」卡片
+function renderRateCard(nr, lte, wcdma, cnw) {
+  const $ = id => document.getElementById(id);
+  const note = $('rt-note');
+  const setAll = (bw, dl, ul, ly, eff, dlt, ult) => {
+    $('rt-bw').textContent = bw; $('rt-dlmod').textContent = dl;
+    $('rt-ulmod').textContent = ul; $('rt-layers').textContent = ly;
+    $('rt-eff').textContent = eff; $('rt-dl').textContent = dlt; $('rt-ul').textContent = ult;
+  };
+
+  // 3G：HSPA 不使用资源块调度模型，无法按此估算
+  if (!nr && !lte) {
+    setAll('--', '--', '--', '--', '--', '--', '--');
+    note.innerHTML = wcdma
+      ? '<div>⚠️ 3G（WCDMA/HSPA）不使用 LTE/NR 的资源块调度模型，无法按此方式估算。</div>'
+      : '<div>⚠️ 无可用链路数据。</div>';
+    return;
+  }
+
+  const cnwNR = (cnw && cnw.nr) || {};
+  const cnwLTE = (cnw && cnw.lte) || {};
+
+  const bws = [], dlMods = [], ulMods = [], lys = [];
+  let dlLow = 0, dlHigh = 0, ulLow = 0, ulHigh = 0;
+  let eff = null, unknownMod = false;
+
+  if (nr) {
+    let bw = cnwNR.bwMHz;
+    if (isNaN(bw)) bw = bwMHzFromIdx(true, nr.dlbw);
+    const r = estLinkRate({
+      isNR: true, bwMHz: bw, band: nr.band,
+      dlMod: cnwNR.dlMod, ulMod: cnwNR.ulMod, snr: nr.snr, rsrp: nr.rsrp
+    });
+    if (!r || !r.dl) unknownMod = true;
+    bws.push('NR ' + bwTxtOf(bw));
+    dlMods.push(cnwNR.dlMod || '--');
+    ulMods.push(cnwNR.ulMod || '--');
+    if (r) {
+      lys.push('NR ' + r.layers + ' ' + wbT('层'));
+      if (r.dl) { dlLow += r.dl.low; dlHigh += r.dl.high; eff = r.dl; }
+      if (r.ul) { ulLow += r.ul.low; ulHigh += r.ul.high; }
+    }
+  }
+  if (lte) {
+    let bw = cnwLTE.bwMHz;
+    if (isNaN(bw)) bw = bwMHzFromIdx(false, lte.dlbw);
+    const r = estLinkRate({
+      isNR: false, bwMHz: bw, band: lte.band,
+      dlMod: cnwLTE.dlMod, ulMod: cnwLTE.ulMod, snr: lte.snr, rsrp: lte.rsrp
+    });
+    if (!r || !r.dl) unknownMod = true;
+    bws.push('LTE ' + bwTxtOf(bw));
+    dlMods.push(cnwLTE.dlMod || '--');
+    ulMods.push(cnwLTE.ulMod || '--');
+    if (r) {
+      lys.push('LTE ' + r.layers + ' ' + wbT('层'));
+      if (r.dl) { dlLow += r.dl.low; dlHigh += r.dl.high; if (!eff) eff = r.dl; }
+      if (r.ul) { ulLow += r.ul.low; ulHigh += r.ul.high; }
+    }
+  }
+
+  const dlTxt = (unknownMod && dlHigh === 0)
+    ? '--'
+    : fmtRange({ low: dlLow, high: dlHigh });
+  const ulTxt = (unknownMod && ulHigh === 0)
+    ? '--'
+    : fmtRange({ low: ulLow, high: ulHigh });
+
+  setAll(
+    bws.join(' + '),
+    dlMods.join(' / '),
+    ulMods.join(' / '),
+    lys.join(' + ') || '--',
+    eff ? (eff.effLow.toFixed(2) + ' ~ ' + eff.effHigh.toFixed(2) + ' bit/RE') : '--',
+    dlTxt, ulTxt
+  );
+
+  // 提示：拆成短句，便于 i18n 逐条匹配
+  const tips = [
+    '⚠️ 理论估算，不是实测速率，也不是运营商签约速率。',
+    '下行流数（MIMO 层数）AT 指令读不到，按 RSRP/SNR 推断。',
+    '实测吞吐通常为估算值的 60%~85%（调度、核心网限速、TCP 开销）。',
+    '准确速率请用 iperf3 或测速工具实测。'
+  ];
+  if (nr && lte) tips.push('NSA 为 NR 与 LTE 锚点之和，实际分流比例由网络决定。');
+  if (unknownMod && dlHigh === 0) tips.push('当前未取到调制方式，无法估算（CNWINFO 未返回）。');
+  note.innerHTML = tips.map(t => '<div>' + wbT(t) + '</div>').join('');
+}
+
+// ===== CPSI 解析（按制式区分，字段索引对照手册 4.2.12）=====
+// 单位约定（手册 4.2.12 参数定义，勿混淆）：
+//   <RSRP> / <RSRQ> / <RSSI> → 已 ×10 上报，展示前需 /10
+//   <SNR>  → 取值 -23~40，即 -23.0~40.0 dB，1 单位 = 1 dB，**不能 /10**
+//   <RSSNR>(LTE) → SINR，取值 0~30，整数值，同样不 /10
+function num(v) { const n = parseFloat(v); return isNaN(n) ? NaN : n; }
+function findPlmn(parts) {
+  for (let i = 1; i < parts.length; i++) if (/^\d{3}-\d{2,3}/.test(parts[i].replace(/"/g, ''))) return i;
+  return -1;
+}
+function parseCpsiLine(line) {
+  const l = line.replace(/^\+CPSI:\s*/, '');
+  const parts = l.split(',');
+  const mode = (parts[0] || '').trim();
+
+  if (mode.startsWith('NR5G_NSA')) {
+    // 无 PLMN：<PCellID>,<Band>,<earfcn/ssb>,<RSRP>,<RSRQ>,<SNR>,<scs>,<NR_dl_bw>
+    return {
+      mode, pci: parts[1], band: parts[2], earfcn: parts[3],
+      rsrp: num(parts[4]) / 10, rsrq: num(parts[5]) / 10, snr: num(parts[6]),
+      dlbw: num(parts[8])
+    };
+  }
+  if (mode.startsWith('NR5G_SA')) {
+    // <MCC-MNC>,<TAC>,<SCellID>,<PCellID>,<Band>,<earfcn>,<RSRP>,<RSRQ>,<SNR>
+    const m = findPlmn(parts);
+    if (m < 0) return { mode };
+    return {
+      mode, plmn: parts[m], tac: parts[m+1], scellid: parts[m+2], pci: parts[m+3],
+      band: parts[m+4], earfcn: parts[m+5],
+      rsrp: num(parts[m+6]) / 10, rsrq: num(parts[m+7]) / 10, snr: num(parts[m+8])
+    };
+  }
+  if (mode.startsWith('LTE')) {
+    // <MCC-MNC>,<TAC>,<SCellID>,<PCellID>,<Band>,<earfcn>,<dlbw>,<ulbw>,<RSRQ>,<RSRP>,<RSSI>,<RSSNR>
+    const m = findPlmn(parts);
+    if (m < 0) return { mode };
+    return {
+      mode, plmn: parts[m], tac: parts[m+1], scellid: parts[m+2], pci: parts[m+3],
+      band: parts[m+4], earfcn: parts[m+5],
+      dlbw: num(parts[m+6]),
+      rsrq: num(parts[m+8]) / 10, rsrp: num(parts[m+9]) / 10,
+      rssi: num(parts[m+10]) / 10, snr: num(parts[m+11])
+    };
+  }
+  if (mode.startsWith('WCDMA')) {
+    // <MCC-MNC>,<LAC>,<Cell ID>,<Band>,<PSC>,<Freq>,<SSC>,<EC/IO>,<RSCP>,<Qual>,<RxLev>,<TXPWR>
+    const m = findPlmn(parts);
+    if (m < 0) return { mode };
+    return {
+      mode, plmn: parts[m], lac: parts[m+1], cellid: parts[m+2],
+      band: parts[m+3], psc: parts[m+4], freq: parts[m+5],
+      ecio: num(parts[m+7]), rscp: num(parts[m+8]), rxlev: num(parts[m+10])
+    };
+  }
+  return { mode };
+}
+
+// ===== 渲染辅助 =====
+function fmt(v, unit, digits) {
+  if (v === undefined || isNaN(v)) return '--';
+  return v.toFixed(digits === undefined ? 1 : digits) + unit;
+}
+function fmtInt(v, unit) {
+  if (v === undefined || isNaN(v)) return '--';
+  return Math.round(v) + unit;
+}
+
+async function refreshSig() {
+  const all = await sendAT('AT+CPSI?;+CRSSI?;+CNWINFO?');
+  const hasErr = /^ERROR/i.test(all.trim()) || !all.trim();
+
+  // 无返回：全部复位
+  if (hasErr) {
+    document.getElementById('sig-main').textContent = '--';
+    document.getElementById('sig-main-lbl').textContent = 'SINR (dB)';
+    document.getElementById('sig-detail').innerHTML = '';
+    document.getElementById('nsa-lte-wrap').style.display = 'none';
+    document.getElementById('sig-rat').textContent = '无数据';
+    const caEl = document.getElementById('ca-status'); if (caEl) caEl.textContent = '无数据（接口无返回）';
+    ['nc-rat','nc-plmn','nc-tac','nc-cellid','nc-pci','nc-band','nc-earfcn','nc-ca'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '--'; });
+    document.getElementById('nc-raw').textContent = '--';
+    renderRateCard(null, null, null, {});
+    return;
+  }
+
+  const cpsiLines = all.split('\n').map(l => l.trim()).filter(l => l.startsWith('+CPSI:'));
+  const rlines = all.split('\n').map(l => l.trim()).filter(l => l.startsWith('+CRSSI:'));
+
+  const parsed = cpsiLines.map(parseCpsiLine);
+  const nr = parsed.find(p => p.mode.startsWith('NR5G'));
+  const lte = parsed.find(p => p.mode.startsWith('LTE'));
+  const wcdma = parsed.find(p => p.mode.startsWith('WCDMA'));
+
+  const hasNR = !!nr;
+  const hasNRSA = !!nr && nr.mode.startsWith('NR5G_SA');
+  const hasLTE = !!lte;
+  const hasWCDMA = !!wcdma;
+  const isNSA = hasNR && hasLTE;   // EN-DC 双连接
+
+  // 主制式标签
+  const pill = document.getElementById('sig-pill');
+  const ratEl = document.getElementById('sig-rat');
+  let caTxt = '未聚合';
+  if (isNSA) { ratEl.textContent = '5G NSA'; caTxt = 'EN-DC 双连接 (4G+5G)'; pill.className = 'status-pill online'; }
+  else if (hasNRSA) { ratEl.textContent = '5G SA'; caTxt = '5G 独立组网 (SA)'; pill.className = 'status-pill online'; }
+  else if (hasLTE) { ratEl.textContent = '4G LTE'; caTxt = 'LTE 单载波'; pill.className = 'status-pill online'; }
+  else if (hasWCDMA) { ratEl.textContent = '3G WCDMA'; caTxt = 'WCDMA (3G)'; pill.className = 'status-pill online'; }
+  else { ratEl.textContent = '无服务'; caTxt = '无服务'; pill.className = 'status-pill offline'; }
+
+  const caEl = document.getElementById('ca-status');
+  if (caEl) caEl.textContent = caTxt;
+
+  // ===== 填充「信号质量」主卡（合并 NR/LTE/WCDMA）=====
+  const detail = document.getElementById('sig-detail');
+  const mainEl = document.getElementById('sig-main');
+  const lblEl = document.getElementById('sig-main-lbl');
+  let html = '';
+  let mainVal = '--', mainPct = 0, mainLbl = 'SINR (dB)';
+
+  if (isNSA) {
+    // NSA：环显示 NR 的 SNR，正文显示 NR 指标 + 下方 LTE 锚点
+    mainLbl = 'SNR (dB)';
+    mainVal = fmtInt(nr.snr, '');
+    mainPct = isNaN(nr.snr) ? 0 : sinrPct(nr.snr);
+    html += '<div class="signal-row"><span class="k">质量评级</span><span class="v">' + gradeHtml(nr.rsrp, nr.snr) + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSRP</span><span class="v">' + fmt(nr.rsrp, ' dBm') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSRQ</span><span class="v">' + fmt(nr.rsrq, ' dB') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">SNR</span><span class="v">' + fmtInt(nr.snr, ' dB') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">带宽</span><span class="v">' + (isNaN(nr.dlbw) ? '--' : (NR_BW[nr.dlbw] || nr.dlbw)) + '</span></div>';
+    html += '<div class="signal-row"><span class="k">频段</span><span class="v">' + bandLabel(nr.band) + '</span></div>';
+    // LTE 锚点子块
+    const nsaWrap = document.getElementById('nsa-lte-wrap');
+    nsaWrap.style.display = 'block';
+    nsaWrap.innerHTML =
+      '<div class="sig-subhead">📡 LTE 锚点（EN-DC）</div>' +
+      '<div class="signal-detail" style="gap:3px;">' +
+      '<div class="signal-row"><span class="k">RSRP</span><span class="v">' + fmt(lte.rsrp, ' dBm') + '</span></div>' +
+      '<div class="signal-row"><span class="k">RSRQ</span><span class="v">' + fmt(lte.rsrq, ' dB') + '</span></div>' +
+      '<div class="signal-row"><span class="k">SINR</span><span class="v">' + fmtInt(lte.snr, ' dB') + '</span></div>' +
+      '<div class="signal-row"><span class="k">带宽</span><span class="v">' + (isNaN(lte.dlbw) ? '--' : (LTE_BW[lte.dlbw] || lte.dlbw)) + '</span></div>' +
+      '<div class="signal-row"><span class="k">频段</span><span class="v">' + bandLabel(lte.band) + '</span></div>' +
+      '</div>';
+  } else if (hasNRSA) {
+    // 5G SA：仅 NR
+    mainLbl = 'SNR (dB)';
+    mainVal = fmtInt(nr.snr, '');
+    mainPct = isNaN(nr.snr) ? 0 : sinrPct(nr.snr);
+    html += '<div class="signal-row"><span class="k">质量评级</span><span class="v">' + gradeHtml(nr.rsrp, nr.snr) + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSRP</span><span class="v">' + fmt(nr.rsrp, ' dBm') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSRQ</span><span class="v">' + fmt(nr.rsrq, ' dB') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">SNR</span><span class="v">' + fmtInt(nr.snr, ' dB') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">频段</span><span class="v">' + bandLabel(nr.band) + '</span></div>';
+    document.getElementById('nsa-lte-wrap').style.display = 'none';
+  } else if (hasLTE) {
+    // 4G：仅 LTE
+    mainLbl = 'SINR (dB)';
+    mainVal = fmtInt(lte.snr, '');
+    mainPct = isNaN(lte.snr) ? 0 : sinrPct(lte.snr);
+    html += '<div class="signal-row"><span class="k">质量评级</span><span class="v">' + gradeHtml(lte.rsrp, lte.snr) + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSRP</span><span class="v">' + fmt(lte.rsrp, ' dBm') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSRQ</span><span class="v">' + fmt(lte.rsrq, ' dB') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSSI</span><span class="v">' + fmt(lte.rssi, ' dBm') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">带宽</span><span class="v">' + (isNaN(lte.dlbw) ? '--' : (LTE_BW[lte.dlbw] || lte.dlbw)) + '</span></div>';
+    html += '<div class="signal-row"><span class="k">频段</span><span class="v">' + bandLabel(lte.band) + '</span></div>';
+    document.getElementById('nsa-lte-wrap').style.display = 'none';
+  } else if (hasWCDMA) {
+    // 3G：WCDMA（RSCP / Ec/Io / RxLev）
+    mainLbl = 'RSCP (dBm)';
+    mainVal = fmt(wcdma.rscp, '', 1);
+    mainPct = isNaN(wcdma.rscp) ? 0 : rscpPct(wcdma.rscp);
+    html += '<div class="signal-row"><span class="k">质量评级</span><span class="v">' + gradeHtml(wcdma.rscp, undefined) + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RSCP</span><span class="v">' + fmt(wcdma.rscp, ' dBm') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">Ec/Io</span><span class="v">' + fmt(wcdma.ecio, ' dB') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">RxLev</span><span class="v">' + fmtInt(wcdma.rxlev, '') + '</span></div>';
+    html += '<div class="signal-row"><span class="k">频段</span><span class="v">' + bandLabel(wcdma.band) + '</span></div>';
+    document.getElementById('nsa-lte-wrap').style.display = 'none';
+  } else {
+    mainVal = '--'; mainPct = 0;
+    html += '<div class="signal-row"><span class="k">状态</span><span class="v">无服务</span></div>';
+    document.getElementById('nsa-lte-wrap').style.display = 'none';
+  }
+  detail.innerHTML = html;
+  mainEl.textContent = mainVal;
+  lblEl.textContent = mainLbl;
+  setRing('sig-ring', mainPct);
+
+  // ===== CRSSI 天线 =====
+  const renderAnt = (prefix, line) => {
+    const parts = line.replace(/^\+CRSSI:\s*/, '').split(',');
+    for (let i = 0; i < 4; i++) {
+      const bar = document.getElementById('ant-' + prefix + i);
+      const val = document.getElementById('v-' + prefix + i);
+      if (!bar) continue;
+      const v = parseInt(parts[i + 1]);
+      if (isNaN(v) || v >= 0) { val.textContent = '--'; bar.style.height = '0%'; }
+      else { val.textContent = v + ' dBm'; bar.style.height = signalPct(v) + '%'; }
+    }
+  };
+  for (const line of rlines) {
+    const rat = (line.replace(/^\+CRSSI:\s*/, '').split(',')[0] || '').trim();
+    if (/NR/i.test(rat)) renderAnt('nr', line);
+    else if (/LTE/i.test(rat)) renderAnt('lte', line);
+  }
+  // 天线卡显示/隐藏
+  const nrAntCard = document.getElementById('nr-ant-card');
+  const lteAntCard = document.getElementById('lte-ant-card');
+  if (nrAntCard) nrAntCard.style.display = (hasNR) ? '' : 'none';
+  if (lteAntCard) lteAntCard.style.display = (hasLTE) ? '' : 'none';
+
+  // ===== 网络与小区详情（主服务小区）=====
+  const main = nr || lte || wcdma;
+  if (main) {
+    document.getElementById('nc-rat').textContent = main.mode || '--';
+    document.getElementById('nc-plmn').textContent = (main.plmn || '').replace(/"/g, '') || '--';
+    document.getElementById('nc-tac').textContent = main.tac || main.lac || '--';
+    document.getElementById('nc-cellid').textContent = main.scellid || main.cellid || '--';
+    document.getElementById('nc-pci').textContent = main.pci || main.psc || '--';
+    document.getElementById('nc-band').textContent = bandLabel(main.band);
+    document.getElementById('nc-earfcn').textContent = main.earfcn || main.freq || '--';
+  }
+  document.getElementById('nc-ca').textContent = caTxt;
+
+  // ===== 链路速率估算（复用同一次 AT 返回里的 CNWINFO，无额外查询）=====
+  renderRateCard(nr, lte, wcdma, parseCnwinfoAll(all));
+
+  // ===== 原始应答 =====
+  const rawClean = all.split('\n').map(l => l.replace(/\r$/, ''))
+                    .filter(l => l.trim() && !/^AT/.test(l) && l.trim() !== 'OK' && l.trim() !== 'ERROR')
+                    .join('\n');
+  document.getElementById('nc-raw').textContent = rawClean || '--';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  refreshSig();
+  // 注册给右上角「自动刷新」开关（默认关闭）
+  window.__pageRefresh = refreshSig;
+});
+</script>
+</body>
+</html>

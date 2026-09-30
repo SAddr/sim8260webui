@@ -1,0 +1,13 @@
+[Unit]
+Description=Read from /dev/smd8 and write to ttyIN2
+BindsTo=socat-smd8.service
+After=socat-smd8.service
+
+[Service]
+ExecStart=/bin/sh -c "cat /dev/smd8 > /dev/ttyIN2"
+ExecStartPost=/bin/sleep 2s
+Restart=always
+RestartSec=1s
+
+[Install]
+WantedBy=multi-user.target

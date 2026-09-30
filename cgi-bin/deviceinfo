@@ -1,0 +1,110 @@
+#!/bin/sh
+# =====================================================================
+# Simcom WebUI - 设备静态信息 CGI（带内存缓存）
+#
+# 厂商(CGMI)/型号(CGMM)/固件(CGMR)/IMEI(CGSN)/IMSI(CIMI)/ICCID(CICCID)
+# 这些值在模块运行期间不变（除非换 SIM 卡或升级固件）。第一次通过 AT 获取后
+# 缓存到内存 tmpfs（$AT_RUN_DIR/cache/deviceinfo），后续直接读缓存，不再每次
+# 刷新都发 AT 查询 —— 这是「页面刷新接口慢」的主要优化点之一。
+#
+# 输出 key=value，前端按行解析。
+# =====================================================================
+. "$(dirname "$0")/libat.sh"
+
+echo "Content-Type: text/plain; charset=utf-8"
+echo "Cache-Control: no-store"
+echo ""
+
+CACHE_FILE="$AT_RUN_DIR/cache/deviceinfo"
+
+# 缓存有效期（秒）。这些值运行期基本不变，但**换 SIM 卡后 IMSI/ICCID 必须更新**，
+# 所以不能永久缓存：到期自动重取一次。tmpfs 重启即清，这里只兜运行期的换卡。
+# 命中时仍然只是一次读文件（约 70ms），不会退化成每次刷新都发 AT。
+CACHE_TTL=${DEVICEINFO_CACHE_TTL:-600}
+
+# 强制刷新：请求带 ?force=1 时忽略缓存（设备页「刷新」按钮用）。
+case "${QUERY_STRING:-}" in
+    *force=1*) FORCE_REFRESH=1 ;;
+    *)         FORCE_REFRESH="" ;;
+esac
+
+# 缓存是否有效：文件非空 + 未强制刷新 + 首行 #TS 时间戳未超期。
+# （#TS 行以 # 开头，前端按 ^([A-Z]+)= 解析时会自然忽略，无需过滤。）
+cache_valid() {
+    [ -s "$CACHE_FILE" ] || return 1
+    [ -z "$FORCE_REFRESH" ] || return 1
+    _cts=$(sed -n 's/^#TS=//p' "$CACHE_FILE" 2>/dev/null | head -1)
+    [ -n "$_cts" ] || return 1          # 旧格式/无时间戳 → 重建
+    _cnow=$(date +%s 2>/dev/null || echo 0)
+    [ "$_cnow" != "0" ] || return 0     # 拿不到当前时间就别折腾，直接沿用缓存
+    [ $((_cnow - _cts)) -lt "$CACHE_TTL" ]
+}
+
+# 命中缓存：直接返回（不碰 AT 串口）
+if cache_valid; then
+    cat "$CACHE_FILE"
+    exit 0
+fi
+
+AT_DEVICE=$(find_at_device) || { echo "ERROR: no AT serial device"; exit 1; }
+
+# 未命中：需要 AT 获取，抢串口锁（防止并发重复查询）
+if ! acquire_at_lock "$AT_LOCK"; then
+    # 抢锁失败（可能有并发请求正在获取）：再读一次缓存，没有再报错
+    [ -s "$CACHE_FILE" ] && { cat "$CACHE_FILE"; exit 0; }
+    echo "ERROR: AT device busy"
+    exit 1
+fi
+
+# 双检：拿到锁后缓存可能已被并发请求写好
+if cache_valid; then
+    cat "$CACHE_FILE"
+    exit 0
+fi
+
+flush_at_buffer "$AT_DEVICE"
+
+# 静态信息合并查询。CGSN 单独发：部分固件返回 +CME ERROR: memory failure，
+# 放进分号批量里会中断后续子命令。
+_raw=$(send_at_batch "$AT_DEVICE" "AT+CGMI;+CGMM;+CGMR;+CIMI;+CICCID" 5)
+_imei=$(send_at "$AT_DEVICE" "AT+CGSN" 3)
+
+# 解析合并命令响应：CGMI/CGMM/CIMI 为裸文本（按序前 3 个），CGMR/CICCID 带前缀
+_info=$(printf '%s\n' "$_raw" | awk '
+    {
+        gsub(/\r/, "")
+        if ($0 == "" || $0 == "OK" || $0 == "ERROR") next
+        if ($0 ~ /^AT/) next
+        if ($0 ~ /^\+CME ERROR/) next
+        if ($0 ~ /^\+CGMR:/)  { v=$0; sub(/^\+CGMR:[ \t]*/, "", v);  firm=v;  next }
+        if ($0 ~ /^\+ICCID:/) { v=$0; sub(/^\+ICCID:[ \t]*/, "", v); iccid=v; next }
+        if ($0 ~ /^\+/) next
+        if (manu == "")  manu = $0
+        else if (model == "") model = $0
+        else if (imsi == "")  imsi = $0
+    }
+    END {
+        print "MANU="  (manu  ? manu  : "")
+        print "MODEL=" (model ? model : "")
+        print "FIRM="  (firm  ? firm  : "")
+        print "IMSI="  (imsi  ? imsi  : "")
+        print "ICCID=" (iccid ? iccid : "")
+    }
+')
+
+# 解析 IMEI（CGSN 单独响应，取第一个 >=10 位纯数字）
+_imei_v=$(printf '%s\n' "$_imei" | awk '
+    { gsub(/\r/, ""); if ($0 ~ /^[0-9]{10,}$/ && imei == "") imei = $0 }
+    END { print (imei ? imei : "") }
+')
+
+_out="${_info}
+IMEI=${_imei_v}"
+
+mkdir -p "$AT_RUN_DIR/cache" 2>/dev/null
+# 首行写 #TS=<epoch> 作为缓存时间戳（供上面 cache_valid 判有效期）
+printf '#TS=%s\n%s\n' "$(date +%s 2>/dev/null)" "$_out" > "$CACHE_FILE" 2>/dev/null
+chmod 644 "$CACHE_FILE" 2>/dev/null
+
+# 返回结果
+printf '%s\n' "$_out"

@@ -1,0 +1,48 @@
+#!/bin/sh
+# =====================================================================
+# Simcom WebUI - System Info CGI
+# 读取 Linux 系统资源占用 / 时间，供设备页展示（不占用 AT 串口）
+# 输出 key=value 纯文本，前端按行解析。
+# =====================================================================
+
+echo "Content-Type: text/plain; charset=utf-8"
+echo "Cache-Control: no-store"
+echo ""
+
+# ---- 负载 (1/5/15 分钟) ----
+if [ -r /proc/loadavg ]; then
+    echo "LOAD=$(cat /proc/loadavg | awk '{print $1" "$2" "$3}')"
+fi
+
+# ---- 内存 ----
+if [ -r /proc/meminfo ]; then
+    awk '/^MemTotal:/{print "MEMTOTAL=" $2} /^MemAvailable:/{print "MEMAVAIL=" $2}' /proc/meminfo
+    awk '/^SwapTotal:/{print "SWAPTOTAL=" $2} /^SwapFree:/{print "SWAPFREE=" $2}' /proc/meminfo
+fi
+
+# ---- CPU 占用（两次采样 /proc/stat 计算） ----
+if [ -r /proc/stat ]; then
+    read_cpu() {
+        awk '/^cpu /{idle=$5+$6; total=0; for(i=2;i<=NF;i++) total+=$i; print idle, total}' /proc/stat
+    }
+    C1=$(read_cpu)
+    sleep 0.4
+    C2=$(read_cpu)
+    echo "$C1 $C2" | awk '{idle=$3-$1; total=$4-$2; if(total>0) printf "CPU=%.0f%%\n", (1-idle/total)*100; else print "CPU=0%"}'
+fi
+
+# ---- 存储（根分区 与 /etc/machine-id 分区） ----
+df -h / 2>/dev/null | awk 'NR==2{print "ROOT_USED=" $3; print "ROOT_SIZE=" $2; print "ROOT_PCT=" $5}'
+if [ -e /etc/machine-id ]; then
+    df -h /etc/machine-id 2>/dev/null | awk 'NR==2{print "ETC_USED=" $3; print "ETC_SIZE=" $2; print "ETC_PCT=" $5}'
+fi
+
+# ---- 运行时间 ----
+if [ -r /proc/uptime ]; then
+    echo "UPTIME=$(awk '{print $1}' /proc/uptime)"
+fi
+
+# ---- 系统时间 ----
+echo "DATETIME=$(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+exit 0

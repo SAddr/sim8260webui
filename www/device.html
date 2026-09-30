@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>设备信息 · SIM8260</title>
+  <script src="js/wb-theme.js"></script>
+  <script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-title">SIM8260 Control Center</div>
+      <div class="brand-subtitle">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <a href="index.html" class="nav-tab">总览</a>
+    <a href="signal.html" class="nav-tab">信号</a>
+    <a href="network.html" class="nav-tab">网络</a>
+    <a href="device.html" class="nav-tab active">设备</a>
+    <a href="sms.html" class="nav-tab">短信</a>
+    <a href="atcmd.html" class="nav-tab">AT 命令</a>
+    <a href="settings.html" class="nav-tab">设置</a>
+  </nav>
+  <div class="topbar-foot"><span class="status-pill online"><span class="status-dot"></span>已连接</span></div>
+</header>
+
+<main class="container">
+  <div>
+    <h1 class="page-title">设备信息</h1>
+    <p class="page-subtitle">模块身份标识、固件版本与系统资源占用</p>
+  </div>
+
+  <div class="grid grid-dash">
+    <div class="card col-8">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🪪</span> 基本信息</div>
+        <button class="btn btn-sm" onclick="loadInfo()">刷新</button>
+      </div>
+      <table class="info-table">
+        <tr><td>厂商</td><td id="i-manu">--</td></tr>
+        <tr><td>型号</td><td id="i-model">--</td></tr>
+        <tr><td>固件版本</td><td id="i-firm">--</td></tr>
+        <tr><td>IMEI</td><td id="i-imei">--</td></tr>
+        <tr><td>IMSI</td><td id="i-imsi">--</td></tr>
+        <tr><td>ICCID (SIM卡)</td><td id="i-iccid">--</td></tr>
+        <tr><td>SIM 状态</td><td id="i-sim">--</td></tr>
+        <tr><td>模块电压</td><td id="i-volt">--</td></tr>
+        <tr><td>模块温度</td><td id="i-temp">--</td></tr>
+      </table>
+    </div>
+
+    <div class="card col-4">
+      <div class="card-header"><div class="card-title"><span class="icon">⚙️</span> 系统操作</div></div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="btn" onclick="reboot()">🔄 重启模块</button>
+        <button class="btn" onclick="cfun1()">✅ CFUN=1 (全功能)</button>
+        <button class="btn" onclick="cfun0()">⏸ CFUN=0 (最小功能)</button>
+        <button class="btn" onclick="cfun4()">💤 CFUN=4 (飞行模式)</button>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:12px;color:var(--text-muted);">
+        CFUN 0: 最小功能 / 4: 飞行模式(关闭射频) / 1: 全功能
+      </div>
+    </div>
+  </div>
+
+  <!-- CPU 分区温度 + Linux 资源占用 -->
+  <div class="grid grid-dash" style="margin-top:20px;">
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🌡️</span> CPU 分区温度</div>
+        <span style="font-size:12px;color:var(--text-muted);">AT+CCPUTEMP=&lt;zone&gt;</span>
+      </div>
+      <div class="temp-grid">
+        <div class="temp-cell"><div class="tval" id="tz0">--</div><div class="tname">z0</div></div>
+        <div class="temp-cell"><div class="tval" id="tz1">--</div><div class="tname">z1</div></div>
+        <div class="temp-cell"><div class="tval" id="tz2">--</div><div class="tname">z2</div></div>
+        <div class="temp-cell"><div class="tval" id="tz3">--</div><div class="tname">z3</div></div>
+        <div class="temp-cell"><div class="tval" id="tz4">--</div><div class="tname">z4</div></div>
+        <div class="temp-cell"><div class="tval" id="tz5">--</div><div class="tname">z5</div></div>
+        <div class="temp-cell"><div class="tval" id="tz6">--</div><div class="tname">z6</div></div>
+      </div>
+      <div id="cpu-temp-raw" style="font-size:11px;color:var(--text-muted);margin-top:10px;font-family:monospace;word-break:break-all;"></div>
+    </div>
+
+    <div class="card col-6">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">📊</span> 资源占用 (Linux)</div>
+        <button class="btn btn-sm" onclick="loadSysinfo()">刷新</button>
+      </div>
+      <div class="meter-list">
+        <div class="meter-row">
+          <div class="meter-top"><span class="k">CPU 占用</span><span class="v" id="s-cpu">--</span></div>
+          <div class="meter"><div class="meter-fill" id="m-cpu" style="width:0%"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-top"><span class="k">内存</span><span class="v" id="s-mem">--</span></div>
+          <div class="meter"><div class="meter-fill" id="m-mem" style="width:0%"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-top"><span class="k">Swap</span><span class="v" id="s-swap">--</span></div>
+          <div class="meter"><div class="meter-fill" id="m-swap" style="width:0%"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-top"><span class="k">存储 /</span><span class="v" id="s-root">--</span></div>
+          <div class="meter"><div class="meter-fill" id="m-root" style="width:0%"></div></div>
+        </div>
+        <div class="meter-row">
+          <div class="meter-top"><span class="k">存储 /etc/machine-id</span><span class="v" id="s-etc">--</span></div>
+          <div class="meter"><div class="meter-fill" id="m-etc" style="width:0%"></div></div>
+        </div>
+        <div class="divider"></div>
+        <table class="info-table">
+          <tr><td>负载 (1/5/15)</td><td id="s-load">--</td></tr>
+          <tr><td>运行时长</td><td id="s-uptime">--</td></tr>
+          <tr><td>系统时间</td><td id="s-time">--</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Powered by @Valor</div>
+</main>
+
+<script>
+async function sendAT(cmd) {
+  const r = await fetch('/cgi-bin/atcmd?cmd=' + encodeURIComponent(cmd));
+  return await r.text();
+}
+
+// 关键优化：把 6 个并发独立请求合并成一条 ';' 分隔批量命令，
+// 一次串口往返拿回所有值（镜像 index.html 的 refreshAll 做法）。
+async function loadInfo() {
+  const all = await sendAT(
+    'AT+CPIN?;+CBC;+CPMUTEMP;+CCPUTEMP=0;+CCPUTEMP=1;+CCPUTEMP=2;+CCPUTEMP=3;+CCPUTEMP=4;+CCPUTEMP=5;+CCPUTEMP=6'
+  );
+
+  const lines = all.split('\n').map(l => l.replace(/\r$/, '').trim()).filter(Boolean);
+
+  const grabFirst = (prefix) => {
+    const hit = lines.find(l => l.startsWith('+' + prefix + ':'));
+    return hit ? hit.replace(/^\+[A-Z0-9]+:\s*/, '') : '';
+  };
+
+  // 设备静态信息（厂商/型号/固件/IMEI/IMSI/ICCID）走缓存接口 deviceinfo，
+  // 不再并入合并 AT 命令 —— 这些值运行期不变，缓存后无需每次刷新都查串口。
+  loadDeviceInfo();
+
+  // SIM 状态：+CPIN: READY/...
+  const cpinRaw = grabFirst('CPIN');
+  const cpinLine = cpinRaw || lines.find(l => /^(READY|SIM PIN|SIM PUK|NOT INSERTED|SIM PIN2)/.test(l)) || '';
+  document.getElementById('i-sim').textContent = cpinLine || '--';
+
+  document.getElementById('i-volt').textContent = grabFirst('CBC') || '--';
+  document.getElementById('i-temp').textContent = grabFirst('CPMUTEMP') ? grabFirst('CPMUTEMP') + ' ℃' : '--';
+
+  // ---- CPU 分区温度 (AT+CCPUTEMP=0) ----
+  renderCpuTemp(all);
+
+  // ---- Linux 资源占用 ----
+  loadSysinfo();
+}
+
+// 设备静态信息：走 /cgi-bin/deviceinfo（后端已缓存到内存），不再走 AT 串口。
+async function loadDeviceInfo() {
+  try {
+    const r = await fetch('/cgi-bin/deviceinfo');
+    const t = await r.text();
+    const kv = {};
+    t.split('\n').forEach(l => { const m = l.match(/^([A-Z]+)=(.*)$/); if (m) kv[m[1]] = m[2].trim(); });
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = (v || '--'); };
+    set('i-manu', kv.MANU);
+    set('i-model', kv.MODEL);
+    set('i-firm', kv.FIRM);
+    set('i-imei', kv.IMEI);
+    set('i-imsi', kv.IMSI);
+    set('i-iccid', kv.ICCID);
+  } catch (e) {}
+}
+
+// 解析 CPU 分区温度：AT+CCPUTEMP=<zone> 每次返回 +CCPUTEMP: <temp>（单个 zone 温度）。
+// 已用分号批量查询 zone 0~6，响应为 7 条 +CCPUTEMP: 行，按顺序对应 z0..z6。
+function renderCpuTemp(all) {
+  const tempLines = all.split('\n').map(l => l.replace(/\r$/,'').trim())
+                        .filter(l => /^\+?(CCPUTEMP|CPUTEMP):/.test(l));
+  document.getElementById('cpu-temp-raw').textContent = tempLines.length ? ('原始: ' + tempLines.join(' | ')) : '';
+  const temps = tempLines.map(l => {
+    const m = l.replace(/^\+?(CCPUTEMP|CPUTEMP):\s*/, '').match(/-?\d+/);
+    return m ? parseInt(m[0]) : NaN;
+  });
+  for (let i = 0; i < 7; i++) {
+    const el = document.getElementById('tz' + i);
+    if (!el) continue;
+    const t = temps[i];
+    const ok = !isNaN(t) && t > 0 && t <= 150;
+    el.textContent = ok ? t + '°' : '--';
+    // 温度色阶：<=45 绿 / 45-60 黄 / 60-75 橙 / >75 红
+    el.style.color = !ok ? 'var(--text-muted)'
+      : t <= 45 ? '#4ade80'
+      : t <= 60 ? '#fbbf24'
+      : t <= 75 ? '#fb923c'
+      : '#f87171';
+  }
+}
+
+// 填进度条（0-100，>=85 红 / >=60 黄 / 否则默认渐变）
+function setMeter(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  el.style.width = p + '%';
+  el.className = 'meter-fill' + (p >= 85 ? ' danger' : p >= 60 ? ' warn' : '');
+}
+
+// 读取 Linux 资源占用（不占 AT 串口，走独立 CGI）
+async function loadSysinfo() {
+  const ids = ['s-cpu','s-load','s-mem','s-swap','s-root','s-etc','s-uptime','s-time'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<span class="loading" style="width:11px;height:11px;"></span>'; });
+  try {
+    const r = await fetch('/cgi-bin/sysinfo');
+    const t = await r.text();
+    const kv = {};
+    t.split('\n').forEach(l => { const m = l.match(/^([A-Z_]+)=(.*)$/); if (m) kv[m[1]] = m[2].trim(); });
+
+    // CPU 占用
+    const cpuPct = parseInt(kv.CPU);
+    document.getElementById('s-cpu').textContent = kv.CPU || '--';
+    setMeter('m-cpu', isNaN(cpuPct) ? 0 : cpuPct);
+
+    // 负载
+    document.getElementById('s-load').textContent = kv.LOAD || '--';
+
+    // 内存（显示已用/总，进度条按已用占比）
+    if (kv.MEMAVAIL && kv.MEMTOTAL) {
+      const avail = Math.round(kv.MEMAVAIL / 1024);
+      const total = Math.round(kv.MEMTOTAL / 1024);
+      const used = total - avail;
+      document.getElementById('s-mem').textContent = used + ' / ' + total + ' MB';
+      setMeter('m-mem', total > 0 ? used / total * 100 : 0);
+    } else {
+      document.getElementById('s-mem').textContent = '--';
+      setMeter('m-mem', 0);
+    }
+
+    // Swap
+    if (kv.SWAPFREE !== undefined && kv.SWAPTOTAL) {
+      const free = Math.round(kv.SWAPFREE / 1024);
+      const total = Math.round(kv.SWAPTOTAL / 1024);
+      const used = total - free;
+      document.getElementById('s-swap').textContent = used + ' / ' + total + ' MB';
+      setMeter('m-swap', total > 0 ? used / total * 100 : 0);
+    } else {
+      document.getElementById('s-swap').textContent = '--';
+      setMeter('m-swap', 0);
+    }
+
+    // 存储 /（ROOT_PCT 为百分比字符串，如 "57%"）
+    const rootPct = parseInt(kv.ROOT_PCT);
+    document.getElementById('s-root').textContent = kv.ROOT_USED
+      ? (kv.ROOT_USED + ' / ' + (kv.ROOT_SIZE||'') + (kv.ROOT_PCT ? ' (' + kv.ROOT_PCT + ')' : ''))
+      : '--';
+    setMeter('m-root', isNaN(rootPct) ? 0 : rootPct);
+
+    // 存储 /etc/machine-id
+    const etcPct = parseInt(kv.ETC_PCT);
+    document.getElementById('s-etc').textContent = kv.ETC_USED
+      ? (kv.ETC_USED + ' / ' + (kv.ETC_SIZE||'') + (kv.ETC_PCT ? ' (' + kv.ETC_PCT + ')' : ''))
+      : '--';
+    setMeter('m-etc', isNaN(etcPct) ? 0 : etcPct);
+
+    // 运行时长
+    if (kv.UPTIME) {
+      const sec = parseInt(kv.UPTIME);
+      const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+      document.getElementById('s-uptime').textContent = (d ? d + '天 ' : '') + h + '时 ' + m + '分';
+    } else {
+      document.getElementById('s-uptime').textContent = '--';
+    }
+    document.getElementById('s-time').textContent = kv.DATETIME || '--';
+  } catch (e) {
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '--'; });
+    ['m-cpu','m-mem','m-swap','m-root','m-etc'].forEach(id => setMeter(id, 0));
+  }
+}
+
+async function reboot() {
+  if (!confirm('确定要重启模块吗？')) return;
+  await sendAT('AT+CFUN=1,1');
+  alert('重启指令已发送，模块将在几秒后重启...');
+}
+async function cfun1() { await sendAT('AT+CFUN=1'); alert('已设置 CFUN=1'); }
+async function cfun0() { if(confirm('设置 CFUN=0（最小功能）？')) { await sendAT('AT+CFUN=0'); alert('已设置 CFUN=0'); } }
+async function cfun4() { if(confirm('设置 CFUN=4（飞行模式，关闭射频）？')) { await sendAT('AT+CFUN=4'); alert('已设置 CFUN=4'); } }
+
+document.addEventListener('DOMContentLoaded', () => { loadInfo(); window.__pageRefresh = loadInfo; });
+</script>
+</body>
+</html>

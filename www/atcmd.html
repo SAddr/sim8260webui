@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>AT 命令终端 · SIM8260</title>
+  <script src="js/wb-theme.js"></script>
+  <script src="js/i18n.js"></script>
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">S</div>
+    <div>
+      <div class="brand-title">SIM8260 Control Center</div>
+      <div class="brand-subtitle">管理面板</div>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <a href="index.html" class="nav-tab">总览</a>
+    <a href="signal.html" class="nav-tab">信号</a>
+    <a href="network.html" class="nav-tab">网络</a>
+    <a href="device.html" class="nav-tab">设备</a>
+    <a href="sms.html" class="nav-tab">短信</a>
+    <a href="atcmd.html" class="nav-tab active">AT 命令</a>
+    <a href="settings.html" class="nav-tab">设置</a>
+  </nav>
+  <div class="topbar-foot">
+    <span class="status-pill online" id="status-pill">
+      <span class="status-dot"></span>
+      <span id="status-text">已连接</span>
+    </span>
+  </div>
+</header>
+
+<main class="container">
+  <div>
+    <h1 class="page-title">命令终端</h1>
+    <p class="page-subtitle">AT 命令控制台 + 受限 Linux 终端</p>
+  </div>
+
+  <!-- Tab 切换 -->
+  <div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button class="btn btn-primary" id="tab-at" onclick="switchTab('at')">💻 AT 控制台</button>
+    <button class="btn" id="tab-shell" onclick="switchTab('shell')">🐧 Linux 终端</button>
+  </div>
+
+  <!-- ============ AT 控制台 ============ -->
+  <div id="panel-at">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">💻</span> 命令行</div>
+        <div>
+          <button class="btn btn-sm" onclick="exportLog()">导出记录</button>
+          <button class="btn btn-sm" onclick="clearTerm()">清空</button>
+          <button class="btn btn-sm btn-primary" onclick="sendInput()">执行</button>
+        </div>
+      </div>
+      <div class="terminal" id="terminal">
+<div class="prompt">SIM8260 AT Terminal v1.1
+输入 AT 命令后回车执行，或从下方预设命令选择
+------------------------------------------------</div>
+      </div>
+      <div class="input-group" style="margin-top:12px;">
+        <input type="text" class="input" id="cmd-input" placeholder="输入 AT 命令，例如 AT+CSQ" 
+               onkeydown="if(event.key==='Enter')sendInput()" />
+        <button class="btn btn-primary" onclick="sendInput()">发送</button>
+      </div>
+    </div>
+
+    <!-- 预设命令库 -->
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">⚡</span> 预设命令库</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" class="input" id="preset-filter" placeholder="筛选预设命令…" style="width:180px;"
+                 oninput="renderPresets()" />
+        </div>
+      </div>
+      <div id="preset-list" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- ============ Linux 终端 ============ -->
+  <div id="panel-shell" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="icon">🐧</span> Linux 终端</div>
+        <div>
+          <button class="btn btn-sm" onclick="clearShell()">清空</button>
+        </div>
+      </div>
+      <div class="terminal" id="shell-term">
+<div class="prompt">受限只读 Linux 终端
+支持：ls / free / df / cat / ps / top / uname / date / ifconfig / ip / dmesg / grep 等
+禁止：rm / dd / reboot / kill / 重定向 / 管道拼接 等危险操作
+------------------------------------------------</div>
+      </div>
+      <div class="input-group" style="margin-top:12px;">
+        <input type="text" class="input" id="shell-input" placeholder="输入 Linux 命令，例如 free -m"
+               onkeydown="if(event.key==='Enter')sendShell()" />
+        <button class="btn btn-primary" onclick="sendShell()">执行</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:10px;">
+        ⚠️ 出于安全考虑，本终端仅允许只读/查询命令，写操作与危险命令会被拒绝。
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    警告：请在了解命令作用后再执行，错误的命令可能导致模块异常。
+  </div>
+</main>
+
+<script>
+const term = document.getElementById('terminal');
+const input = document.getElementById('cmd-input');
+let history = [];
+let histIdx = -1;
+
+async function sendAT(cmd) {
+  try {
+    const r = await fetch('/cgi-bin/atcmd?cmd=' + encodeURIComponent(cmd));
+    return await r.text();
+  } catch (e) {
+    return 'ERROR: ' + e.message;
+  }
+}
+
+function appendText(html, cls = '') {
+  const div = document.createElement('div');
+  if (cls) div.className = cls;
+  // 终端里写进去的都是 AT 命令与模块原始响应，绝不能被语言切换改写
+  //（中文短信正文、中文运营商名会被翻掉，看到的就不是模块真实返回了）。
+  div.setAttribute('data-i18n-skip', '1');
+  div.innerHTML = html;
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+async function sendInput() {
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  if (!cmd.toUpperCase().startsWith('AT')) {
+    appendText('<span style="color:#f87171">命令必须以 AT 开头</span>', 'error');
+    return;
+  }
+  await runAt(cmd, cmd);
+}
+
+async function runAt(cmd, display) {
+  history.push(cmd);
+  histIdx = history.length;
+  appendText('<span style="color:#4ade80">&gt; ' + escapeHtml(display) + '</span>');
+  input.value = '';
+  const t0 = performance.now();
+  const resp = await sendAT(cmd);
+  const t1 = performance.now();
+  const clean = escapeHtml(resp).replace(/\n/g, '<br>');
+  const isErr = /ERROR/.test(resp) || /^ERROR:/.test(resp.trim());
+  appendText(clean + `<span style="color:#64748b;font-size:11px">— ${(t1-t0).toFixed(0)}ms</span>`, isErr ? 'error' : 'response');
+}
+
+function clearTerm() {
+  term.innerHTML = '<div class="prompt">Terminal cleared.</div>';
+}
+
+// 注意：必须转义引号。预设命令里带双引号（AT+CQCMAP="WWAN"、
+// AT+CSYSSEL="nr5g_band",79），不转义的话填进 title/onclick 属性时会把
+// 属性提前截断 —— 之前「拨号状态」按钮点了没反应就是这么来的。
+function escapeHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ---- 导出记录（下载为 txt）----
+function exportLog() {
+  const text = term.innerText;
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'at-log-' + new Date().toISOString().replace(/[:.]/g,'-') + '.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---- 预设命令库 ----
+const presets = [
+  { label: '显示模块 ID 信息', cmd: 'ATI' },
+  { label: '版本查询', cmd: 'AT+CGMR' },
+  { label: 'QCN 版本查询', cmd: 'AT+CQCNV' },
+  { label: '读取 CPU 区域温度', cmd: 'AT+CCPUTEMP=0' },
+  { label: '查询 IMEI', cmd: 'AT+CGSN' },
+  { label: '查询 IMSI', cmd: 'AT+CIMI' },
+  { label: '查询 SIM 卡状态', cmd: 'AT+CPIN?' },
+  { label: '查询功能模式', cmd: 'AT+CFUN?' },
+  { label: '读取电源电压', cmd: 'AT+CBC' },
+  { label: '信号强度', cmd: 'AT+CSQ' },
+  { label: '系统信息', cmd: 'AT+CPSI?' },
+  { label: '每根天线信号', cmd: 'AT+CRSSI?' },
+  { label: '网络详情', cmd: 'AT+CNWINFO?' },
+  { label: 'APN 列表', cmd: 'AT+CGDCONT?' },
+  { label: '注册状态', cmd: 'AT+CEREG?' },
+  { label: '5G 注册', cmd: 'AT+C5GREG?' },
+  { label: '拨号状态', cmd: 'AT+CQCMAP="WWAN"' },
+  { label: 'USB 配置', cmd: 'AT+CUSBCFG?' },
+  { label: '网口模式', cmd: 'AT+CWETHMODE?' },
+  { label: '重启模块', cmd: 'AT+CFUN=1,1', danger: true },
+
+  // ---- 拨号 / 数据业务 ----
+  { label: '拨号链路状态', cmd: 'AT$QCRMCALL?', note: '查询当前数据拨号连接状态' },
+  { label: '启动拨号', cmd: 'AT$QCRMCALL=1,1' },
+  { label: '断开拨号', cmd: 'AT$QCRMCALL=0,1', danger: true, confirm: true,
+    warn: '会立即断开数据连接，正在上网会掉线。' },
+  { label: 'PS 域附着状态', cmd: 'AT+CGATT?', note: '1 = 已附着到数据业务' },
+  { label: 'CS 域注册', cmd: 'AT+CREG?', note: '2G/3G 电路域注册；查 4G EPS 注册请用 AT+CEREG?（见上方「注册状态」）' },
+
+  // ---- USB 模式 ----
+  { label: '支持的 USB 模式', cmd: 'AT+CUSBCFG=?' },
+  { label: '切 RNDIS（电脑拨号）', cmd: 'AT+CUSBCFG=usbid,1e0e,901e', danger: true, confirm: true,
+    warn: 'USB 会重新枚举，当前 ADB / 网页连接可能中断，需重新连接。' },
+  { label: '切 9001（备份 QCN）', cmd: 'AT+CUSBCFG=usbid,1e0e,9001', danger: true, confirm: true,
+    warn: 'USB 会重新枚举，当前 ADB / 网页连接可能中断，需重新连接。' },
+  { label: '开启 ADB', cmd: 'AT+CUSBCFG=usbadb,1', danger: true, confirm: true,
+    warn: 'USB 会重新枚举，当前连接可能中断。' },
+
+  // ---- 锁网 / 锁频段 ----
+  { label: '锁 5G', cmd: 'AT+CNMP=71', danger: true, confirm: true,
+    warn: '锁定网络制式，若当地无 5G 覆盖会直接掉网。' },
+  { label: '锁 4G', cmd: 'AT+CNMP=38', danger: true, confirm: true,
+    warn: '锁定网络制式，若当地无 4G 覆盖会直接掉网。' },
+  { label: '锁 n79', cmd: 'AT+CSYSSEL="nr5g_band",79', danger: true, confirm: true,
+    warn: '锁定 5G 频段，频段不匹配会直接掉网。' },
+  { label: '解锁全部频段', cmd: 'AT+CSYSSEL', danger: true, confirm: true,
+    warn: '恢复全频段搜索。' },
+  { label: '查询 5G 支持频段', cmd: 'AT+CSYSSEL="nr5g_band"' },
+
+  // ---- 调试（危险，只载入不直发）----
+  { label: '写 IMEI（需先修改）', cmd: 'AT+SIMEI=000000000000000', danger: true, confirm: true, loadOnly: true,
+    warn: '写入 IMEI 是不可逆操作，且示例值是占位符（全 0）。直接发送会把 IMEI 写成无效值。' },
+];
+
+function renderPresets() {
+  const kw = (document.getElementById('preset-filter').value || '').trim().toLowerCase();
+  const list = document.getElementById('preset-list');
+  const items = presets.filter(p => !kw || p.label.toLowerCase().includes(kw) || p.cmd.toLowerCase().includes(kw));
+  // 用 data-idx + 事件绑定，不用内联 onclick：命令里含双引号时，内联写法会同时
+  // 截断 HTML 属性和 JS 字符串（旧的「拨号状态」按钮因此点了没反应）。
+  list.innerHTML = items.map((p, i) =>
+    '<button type="button" class="btn btn-sm ' + (p.danger ? 'btn-danger' : '') + '" data-idx="' + i + '" ' +
+    'title="' + escapeHtml(p.cmd + (p.note ? '  —  ' + p.note : '')) + '">' +
+    escapeHtml(p.label) +
+    ' <span style="opacity:.6;font-family:monospace;font-size:11px;">' + escapeHtml(p.cmd) + '</span></button>'
+  ).join('');
+  list.querySelectorAll('button[data-idx]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const p = items[parseInt(b.getAttribute('data-idx'), 10)];
+      if (p) handlePreset(p);
+    });
+  });
+}
+
+// 点击预设：默认直接发送；带 confirm 的先二次确认；带 loadOnly 的只载入输入框
+// （这类命令含占位值或不可逆，必须先改好再手动发）。
+function handlePreset(p) {
+  if (p.loadOnly) {
+    input.value = p.cmd;
+    input.focus();
+    appendText('<span style="color:#fbbf24">▸ ' + escapeHtml(p.label) +
+               ' 已载入输入框，请修改后再回车执行</span>');
+    return;
+  }
+  if (p.confirm) {
+    const msg = '确认执行？\n\n' + p.cmd + '\n\n' + (p.warn || '该操作会改变模块配置。');
+    if (!confirm(msg)) {
+      appendText('<span style="color:#64748b">▸ 已取消：' + escapeHtml(p.label) + '</span>');
+      return;
+    }
+  }
+  appendText('<span style="color:#60a5fa">▸ ' + escapeHtml(p.label) + '</span>');
+  runAt(p.cmd, p.cmd);
+}
+
+// ---- Tab 切换 ----
+function switchTab(t) {
+  const at = document.getElementById('panel-at');
+  const sh = document.getElementById('panel-shell');
+  const btAt = document.getElementById('tab-at');
+  const btSh = document.getElementById('tab-shell');
+  if (t === 'at') {
+    at.style.display = ''; sh.style.display = 'none';
+    btAt.className = 'btn btn-primary'; btSh.className = 'btn';
+  } else {
+    at.style.display = 'none'; sh.style.display = '';
+    btSh.className = 'btn btn-primary'; btAt.className = 'btn';
+  }
+}
+
+// ---- Linux 终端（受限只读）----
+const shellTerm = document.getElementById('shell-term');
+function appendShell(html, cls = '') {
+  const div = document.createElement('div');
+  if (cls) div.className = cls;
+  // 同 appendText：Linux 终端输出是系统原文（中文路径、进程名等），不参与翻译。
+  div.setAttribute('data-i18n-skip', '1');
+  div.innerHTML = html;
+  shellTerm.appendChild(div);
+  shellTerm.scrollTop = shellTerm.scrollHeight;
+}
+async function sendShell() {
+  const cmd = document.getElementById('shell-input').value.trim();
+  if (!cmd) return;
+  appendShell('<span style="color:#4ade80">root@module:/# ' + escapeHtml(cmd) + '</span>');
+  document.getElementById('shell-input').value = '';
+  try {
+    const r = await fetch('/cgi-bin/shell?cmd=' + encodeURIComponent(cmd));
+    const t = await r.text();
+    appendShell(escapeHtml(t).replace(/\n/g, '<br>'));
+  } catch (e) {
+    appendShell('<span style="color:#f87171">ERROR: ' + escapeHtml(e.message) + '</span>', 'error');
+  }
+}
+function clearShell() {
+  shellTerm.innerHTML = '<div class="prompt">Shell cleared.</div>';
+}
+
+// 上下键历史（AT 终端）
+input.addEventListener('keydown', e => {
+  if (e.key === 'ArrowUp' && history.length > 0) {
+    histIdx = Math.max(0, histIdx - 1);
+    input.value = history[histIdx] || '';
+    e.preventDefault();
+  } else if (e.key === 'ArrowDown') {
+    histIdx = Math.min(history.length, histIdx + 1);
+    input.value = history[histIdx] || '';
+    e.preventDefault();
+  }
+});
+
+renderPresets();
+input.focus();
+</script>
+</body>
+</html>

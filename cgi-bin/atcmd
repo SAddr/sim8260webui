@@ -1,0 +1,71 @@
+#!/bin/sh
+# Simcom WebUI - AT Command CGI
+# 用 microcom 通过 socat PTY 桥接（或直连 smd8）和模块 AT 口通信
+
+# 加载公共库（与 sms 共享设备探测/锁/清缓冲/发命令逻辑）
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+. "$SCRIPT_DIR/libat.sh"
+
+# 解析 QUERY_STRING：?cmd=AT+CSQ
+CMD=""
+if [ -n "$QUERY_STRING" ]; then
+    # set -f：关掉通配符展开。$QUERY_STRING 是未加引号展开的（靠 IFS='&' 切分），
+    # 若 URL 里出现 * ? [ 这类字符，shell 会把它们当 glob 去匹配当前目录的文件，
+    # 导致参数被篡改（CGI 的工作目录就是 cgi-bin，很容易真的匹配到东西）。
+    OLD_IFS="$IFS"; IFS='&'; set -f
+    for pair in $QUERY_STRING; do
+        key=$(echo "$pair" | cut -d= -f1)
+        val=$(echo "$pair" | cut -d= -f2-)
+        if [ "$key" = "cmd" ]; then
+            CMD=$(urldecode "$val")
+            break
+        fi
+    done
+    IFS="$OLD_IFS"; set +f
+fi
+
+echo "Content-Type: text/plain; charset=utf-8"
+echo "Cache-Control: no-store"
+echo ""
+
+if [ -z "$CMD" ]; then
+    echo "ERROR: No AT command provided. Use ?cmd=AT+CSQ"
+    exit 0
+fi
+
+# 找 AT 设备
+AT_DEVICE=$(find_at_device)
+if [ -z "$AT_DEVICE" ]; then
+    echo "ERROR: No AT serial device found. Tried: /dev/ttyOUT2 /dev/smd8 /dev/smd7 /dev/smd11"
+    exit 1
+fi
+
+# 原子锁（路径由 at-runenv.sh 解析，和看门狗探活用的是同一把锁）
+if ! acquire_at_lock "$AT_LOCK"; then
+    exit 1
+fi
+
+# 清缓冲（吃掉 PTY 残留）
+flush_at_buffer "$AT_DEVICE"
+
+# 发正式命令。
+# SIM82XX 手册 1.4.4 支持分号组合命令（AT+CGMI;+CGMM;+CGMR，一次往返）。
+# 含 ';' 的用 send_at_batch 整条发送 + 读静默（捕获全部子响应，一次串口往返最快）；
+# 单命令用 send_at（命中 OK/ERROR 即返）。两者都只 flush 一次。
+if echo "$CMD" | grep -q ';'; then
+    RESULT=$(send_at_batch "$AT_DEVICE" "$CMD" 5)
+else
+    RESULT=$(send_at "$AT_DEVICE" "$CMD" 3)
+fi
+
+# 去掉命令回显行 + 空行
+# socat echo=0 后，命令回显只剩模块自身 ATE1 的一份，且回显行以 "AT" 开头。
+# 数据行（+CSQ: 19,99 / 厂商 / OK / ERROR）都不以 "AT" 开头，可安全过滤。
+echo "$RESULT" | awk '
+    {
+        gsub(/\r$/, "")
+        if ($0 == "") next
+        if ($0 ~ /^AT/) next   # 命令回显（ATE1）
+        print
+    }
+'
