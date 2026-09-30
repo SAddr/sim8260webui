@@ -1,8 +1,35 @@
-# SIM8260 WebUI - 模块端管理面板
+# SIM8260 WebUI · 5G 模块端管理面板
 
-一套跑在 SIM8260 (SDX62 平台) 5G 模块上的 Web 管理界面，直接通过 CGI/shell 发 AT 命令与模块交互，浏览器访问即可。
+> 一套跑在 **SIM8260（SDX62 平台）5G 模块**上的 Web 管理界面，直接通过 CGI/shell 发 AT 命令与模块交互，浏览器访问即可。
+> A lightweight web management UI for SIM8260 (SDX62) 5G modules — talk to the modem over AT via CGI, no app needed.
+>
+> 🔗 开源地址：https://github.com/SAddr/sim8260webui
 
-参考项目：[quectel-rgmii-toolkit-cn](https://github.com/gaoweifan/quectel-rgmii-toolkit-cn) (SDXLEMUR 分支) 的 Simple Admin，但针对 SIMCom 命令集进行了重写，并对界面进行了升级。
+![Platform](https://img.shields.io/badge/platform-SIM8260%20%2F%20SDX62-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+
+---
+
+## 📑 目录
+
+- [特性](#-特性)
+- [目录结构](#-目录结构)
+- [快速开始](#-快速开始)
+- [安装（Windows 一键）](#-安装windows-一键)
+- [手动部署](#-手动部署)
+- [AT 串口桥接架构](#-at-串口桥接架构)
+- [CGI 并发保护](#-cgi-并发保护)
+- [NAND 写入治理](#-nand-写入治理)
+- [真机验证结果](#-真机验证结果sim8260--sdx62)
+- [已修复的缺陷](#-已修复的缺陷)
+- [与参考项目的差异](#-与参考项目的差异)
+- [注意事项](#-注意事项)
+- [致谢](#-致谢)
+- [关于作者](#-关于作者)
+- [License](#license)
+
+---
 
 ## ✨ 特性
 
@@ -14,6 +41,9 @@
 - 💬 **短信收发**：列表 / 读取 / 发送 / 删除
 - ⚙️ **设置页**：改密码、USB PID 切换、ADB 开关、QCMAP 自动拨号配置
 - 📱 **响应式**：PC 和手机都能用
+- 🌏 **中/英双语**：默认中文，可切换并记忆（localStorage）
+
+---
 
 ## 📁 目录结构
 
@@ -29,13 +59,13 @@ simcom-webui/
 │   ├── settings.html        # 设置 / 改密码
 │   ├── css/styles.css       # 样式 (深色科技风)
 │   └── js/
-│       ├── wb-theme.js      # 主题初始化
-│       └── i18n.js          # ★ 中/英双语（默认中文，切换后存 localStorage）
+│       ├── wb-theme.js      # 主题初始化 + 全局 fetch 超时/串行化封装
+│       └── i18n.js          # 中/英双语切换（默认中文，切换后存 localStorage）
 ├── cgi-bin/
 │   ├── libat.sh             # 公共库：设备探测/原子锁/清缓冲/发命令
 │   ├── atcmd                # CGI：发任意 AT 命令
 │   ├── sms                  # CGI：短信 list/read/send/del
-│   ├── deviceinfo           # ★ CGI：设备静态信息（AT 取一次后缓存到内存）
+│   ├── deviceinfo           # CGI：设备静态信息（AT 取一次后缓存到内存）
 │   ├── shell                # CGI：受限只读 Linux 终端
 │   ├── sysinfo              # CGI：系统资源信息（不占串口）
 │   └── password             # CGI：改密码 / 查询认证状态
@@ -48,16 +78,31 @@ simcom-webui/
 │   ├── socat-smd8-to-ttyIN2.service   # ⚠️ 同上
 │   ├── socat-smd8-from-ttyIN2.service # ⚠️ 同上
 │   ├── start_socat_bridge.sh # 启动入口（内部委托看门狗）
-│   ├── bridge_watchdog.sh   # ★ 桥接唯一 owner：拉起 socat+两条腿，巡检+真实AT探活+异常重建
-│   ├── bridge_status.sh     # ★ 桥接一键自检 9 项（判断"是不是有服务没起来"）
+│   ├── bridge_watchdog.sh   # 桥接唯一 owner：拉起 socat+两条腿，巡检+真实AT探活+异常重建
+│   ├── bridge_status.sh     # 桥接一键自检 9 项（判断"是不是有服务没起来"）
 │   └── fix_systemd_autostart.sh # 开机自愈+诊断（只维护 lighttpd 单元；/etc 只读时兜底）
-├── at-runenv.sh             # ★ 运行时目录解析（只落在内存 fs，避免写 NAND）
+├── at-runenv.sh             # 运行时目录解析（只落在内存 fs，避免写 NAND）
 ├── deploy_to_modem.bat      # Windows 一键部署
 ├── install.sh               # 模块端安装脚本
-└── uninstall.sh             # 卸载脚本
+├── uninstall.sh             # 卸载脚本
+└── probe_wwan_smartfren.sh  # WWAN 探测辅助脚本
 ```
 
-## 🚀 安装（Windows 一键）
+---
+
+## 🚀 快速开始
+
+> 前提：模块已开 ADB（`AT+CUSBCFG=usbadb,1`）、已装 Entware + lighttpd（`opkg install lighttpd`）
+
+1. 把 `adb.exe` + `AdbWinApi.dll` + `AdbWinUsbApi.dll` 放到本项目目录（与 `deploy_to_modem.bat` 同级，可选，否则用 PATH 里的 adb）；
+2. 双击 `deploy_to_modem.bat`——脚本会自动探测设备 → `adb root` → 推送文件 → 跑 `install.sh`；
+3. 浏览器访问 `http://192.168.225.1:8888/`，默认账号 `admin / admin`。
+
+详见下方 [安装（Windows 一键）](#-安装windows-一键) 与 [手动部署](#-手动部署)。
+
+---
+
+## 🔧 安装（Windows 一键）
 
 > 前提：模块已开 ADB（`AT+CUSBCFG=usbadb,1`）、已装 Entware + lighttpd（`opkg install lighttpd`）
 
@@ -74,7 +119,9 @@ http://192.168.225.1:8888/
 默认账号：admin / admin
 ```
 
-## 🔧 手动部署（不用 bat）
+---
+
+## 🔌 手动部署（不用 bat）
 
 ```bash
 # 1. 推送到模块
@@ -82,6 +129,8 @@ adb push simcom-webui /tmp/simcom-webui
 # 2. 安装
 adb shell sh /tmp/simcom-webui/install.sh
 ```
+
+---
 
 ## 🔌 AT 串口桥接架构
 
@@ -237,6 +286,8 @@ ls -la /dev/ttyIN2 /dev/ttyOUT2            # 桥接设备应存在
 sh /userdata/simcom-webui/autostart.sh &
 ```
 
+---
+
 ## ⚙️ CGI 并发保护
 
 - 多个页面会并发发 AT 命令 → 后端 CGI 用 `mkdir` 原子锁串行化（锁路径由 `at-runenv.sh` 解析，落在内存 fs）
@@ -246,6 +297,8 @@ sh /userdata/simcom-webui/autostart.sh &
 - 前端 `wb-theme.js` 另外把 `/cgi-bin/atcmd` 请求在客户端串行化成一条链，避免并发堆在服务端排队
 - 每次命令前用固定 150ms 短读清空 PTY 残留，避免响应串线/冗余
 - `send_at` 用「写命令 + 后台 cat 读 + 轮询 OK/ERROR/超时」，抓到终止符后先读静默再 kill，保证零残留
+
+---
 
 ## 💾 NAND 写入治理（日志/心跳/锁/临时文件不写闪存）
 
@@ -282,7 +335,9 @@ sh .../bridge_watchdog.sh --rundir     # 直接打印日志/心跳/锁/临时文
 sh .../bridge_status.sh                # 第 [9] 项给结论
 ```
 
-### ✅ 真机验证结果（SIM8260 / SDX62）
+---
+
+## ✅ 真机验证结果（SIM8260 / SDX62）
 
 `/proc/mounts` 实测拓扑：`/dev/shm`、`/run`、`/tmp` **三个都是 tmpfs**；
 `/etc`、`/userdata` 是 `ubi2_0`（NAND）。解析器选中的落点 = **`/dev/shm/simcom-webui`**（`AT_RUN_IS_RAM=1`）。
@@ -298,6 +353,8 @@ sh .../bridge_status.sh                # 第 [9] 项给结论
 | NAND 审计 | `find /userdata/simcom-webui -name '*.log' -o -name '*.pid' -o -name 'at_hb*'` → **空** ✅ |
 | 桥进程唯一性 | 1×socat、1×读腿、1×写腿、1×看门狗守护；旧 `socat-*.service` 已清除 ✅ |
 
+---
+
 ## 🐞 已修复的缺陷（本轮代码走查）
 
 **后端 / 桥脚本**
@@ -307,9 +364,8 @@ sh .../bridge_status.sh                # 第 [9] 项给结论
 | `send_at_batch` 漏登记后台读线程 | 批量命令（最长 8~20s）期间浏览器切页 → cat 变孤儿偷吃响应，**AT 全部转圈圈** | 补 `AT_BG_PIDS` 登记 |
 | `acquire_at_lock` 无法回收"无 ts"僵尸锁 | 持有者死在 `mkdir`↔写 `ts` 之间 → 之后**每个请求都干等满 60s**，重启前不可自愈 | 加 `_lock_nots` ≥10s 强制回收 |
 | `pkill`/`kill` 按 pidfile 盲杀 | pid 复用 → 误杀无关进程 | `_kill_pidfile` 增加 cmdline 关键字匹配 |
-
 | 手工建 PTY symlink 时用探活判方向 | 此刻两条腿还没起，探活必然失败 → 方向被**必然交换**（自环） | 改为确定性 fd 顺序；方向纠正移到两条腿起来之后的 `restart_bridge` |
-| `socat` 起来但 `pty,link=` 失效 | `/dev/ttyIN2|ttyOUT2` 不存在，桥不可用 | 从 `/proc/<pid>/fd` 捞 pts 手工建 symlink（回归修复） |
+| `socat` 起来但 `pty,link=` 失效 | `/dev/ttyIN2\|ttyOUT2` 不存在，桥不可用 | 从 `/proc/<pid>/fd` 捞 pts 手工建 symlink（回归修复） |
 | 日志无限增长 | 长期运行写满分区 / 磨闪存 | `at_log_cap` 字节封顶 + 开机清空 |
 | `acquire_at_lock` 参数写死 `/tmp` | 与看门狗抢的不是同一把锁 → 探活插进 CGI 响应 | 统一由 `at-runenv.sh` 解析 |
 | `install.sh` 未安装 `at-runenv.sh` / 未替换 `@RUNDIR@` | 所有 CGI 静默退回 `/tmp`（可能是 NAND），**NAND 治理失效** | 补拷贝 + 补 `sed` 替换 |
@@ -343,6 +399,8 @@ sh .../bridge_status.sh                # 第 [9] 项给结论
 | `network.html` 锁定状态只看"行是否存在" | `+CCELLCFG?` 未锁定时也回该行 → 未锁也显示"**已锁定**" | 改判首参（`pci=0` = 未锁定）；NR 同样处理 |
 | 并发 AT 无客户端排队 | 进页面即多路并发，一条卡住全部等到超时 | `wb-theme.js` 对 `/cgi-bin/atcmd` 串行化 |
 
+---
+
 ## 📝 与参考项目的差异
 
 | 项目 | Quectel Simple Admin | 本项目 (SIM8260) |
@@ -352,6 +410,8 @@ sh .../bridge_status.sh                # 第 [9] 项给结论
 | 界面风格 | 浅色 Bootstrap 默认 | 深色科技风 + 玻璃拟态 + 渐变 |
 | 信号可视化 | 数字为主 | 信号圆环 + 4 天线柱状图 |
 | CGI 通信 | cat 重定向轮询 | microcom 一次调用 + 原子锁 + 清缓冲 |
+
+---
 
 ## ⚠️ 注意事项
 
@@ -367,6 +427,26 @@ sh .../bridge_status.sh                # 第 [9] 项给结论
   属**自愈**范围，不影响正常使用；若某天觉得这次重建窗口碍事，可让看门狗在 idle 期
   持有一个"只打开不读取"的从设备持有者（注意与 CGI 抢读的时序，目前刻意不做）。
 
+---
+
+## 🙏 致谢
+
+本项目基于 [quectel-rgmii-toolkit-cn](https://github.com/gaoweifan/quectel-rgmii-toolkit-cn)（SDXLEMUR 分支）的 Simple Admin 二次开发，
+针对 SIMCom 命令集重写后端、并对界面做了全面升级。在此感谢原作者的开源贡献。
+
+---
+
+## 👤 关于作者
+
+本项目由 **@Valor** 基于参考项目二次开发、维护并开源。
+
+- 🔗 GitHub：https://github.com/SAddr/sim8260webui
+- 💡 欢迎通过 Issue / Pull Request 提建议、报 Bug、贡献代码。
+
+---
+
 ## 📄 License
 
-MIT（参考项目为 MIT 协议，本项目保持一致）
+[MIT](./LICENSE) — Copyright © @Valor.
+
+衍生自 [quectel-rgmii-toolkit-cn](https://github.com/gaoweifan/quectel-rgmii-toolkit-cn)（同为 MIT 协议），本项目保持一致。
