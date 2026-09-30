@@ -6,7 +6,7 @@
 > 🔗 开源地址：https://github.com/SAddr/sim8260webui
 
 ![Platform](https://img.shields.io/badge/platform-SIM8260%20%2F%20SDX62-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
 ---
@@ -447,6 +447,9 @@ sh .../bridge_status.sh                # 第 [9] 项给结论
 
 ## 📄 License
 
-[MIT](./LICENSE) — Copyright © @Valor.
+[CC BY-NC 4.0](./LICENSE) — Copyright © @Valor.
 
-衍生自 [quectel-rgmii-toolkit-cn](https://github.com/gaoweifan/quectel-rgmii-toolkit-cn)（同为 MIT 协议），本项目保持一致。
+- ✅ **非商业用途免费**（需署名 @Valor）。
+- ⛔ **商业使用需事先获得 @Valor 授权**；如需商业授权，请通过 GitHub 联系。
+
+衍生自 [quectel-rgmii-toolkit-cn](https://github.com/gaoweifan/quectel-rgmii-toolkit-cn)（原项目为 MIT 协议）；本项目在其基础上二次开发，但采用 **CC BY-NC 4.0** 授权以禁止商业使用。
