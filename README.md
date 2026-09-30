@@ -166,8 +166,8 @@ SIM8260 的 AT 口 `/dev/smdX` 如果和电脑 USB AT COM 口共用通道会冲�
 > 注意方向只能在**两条搬运腿起来之后**用真实探活判定（见 `restart_bridge`），
 > 启动 socat 时探活必然超时，不能拿它当"接反了"的依据。
 
-
-**看门狗**：
+### 桥接健康检查与自愈
+**看门狗+自检脚本**：
 
 ```bash
 sh socat-at-bridge/bridge_watchdog.sh            # 常驻（开机自启已接）
@@ -195,7 +195,6 @@ cat /tmp/simcom-webui/log/bridge.log             # 看门狗日志（含"检查�
    串行化后每个请求的超时从「真正开始」计时，行为可预期。
    另外 `libat.sh` 的锁等待上限从 **300 秒收敛到 60 秒**（原值会让页面干转 5 分钟）。
 
-
 ## ⚙️ CGI 并发保护
 
 - 多个页面会并发发 AT 命令 → 后端 CGI 用 `mkdir` 原子锁串行化（锁路径由 `at-runenv.sh` 解析，落在内存 fs）
@@ -205,9 +204,7 @@ cat /tmp/simcom-webui/log/bridge.log             # 看门狗日志（含"检查�
 - 前端 `wb-theme.js` 另外把 `/cgi-bin/atcmd` 请求在客户端串行化成一条链，避免并发堆在服务端排队
 - 每次命令前用固定 150ms 短读清空 PTY 残留，避免响应串线/冗余
 - `send_at` 用「写命令 + 后台 cat 读 + 轮询 OK/ERROR/超时」，抓到终止符后先读静默再 kill，保证零残留
-
 ---
-
 ## 💾 NAND 写入治理（日志/心跳/锁/临时文件不写闪存）
 
 > **背景**：本模块是 **1GB NAND + UBIFS**，擦写寿命有限，而本项目的"高频写入"其实不少：
@@ -218,9 +215,6 @@ cat /tmp/simcom-webui/log/bridge.log             # 看门狗日志（含"检查�
 新增 `at-runenv.sh` 统一解析：直接读 `/proc/mounts` 判定 fs 类型，只在 `tmpfs`/`ramfs` 上建目录，
 按 `/dev/shm → /run → /tmp → /var/tmp` 顺序取第一个可写的内存目录；全都不行才退回 `/tmp` 并把
 `AT_RUN_IS_RAM=0` 暴露给上层**主动告警**（`bridge_status.sh` 第 [9] 项、看门狗启动日志、`--rundir`）。
-
-
----
 
 ## 📝 与参考项目的差异
 
