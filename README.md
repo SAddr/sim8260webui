@@ -166,69 +166,8 @@ SIM8260 的 AT 口 `/dev/smdX` 如果和电脑 USB AT COM 口共用通道会冲�
 > 注意方向只能在**两条搬运腿起来之后**用真实探活判定（见 `restart_bridge`），
 > 启动 socat 时探活必然超时，不能拿它当"接反了"的依据。
 
-### 桥接健康检查与自愈（重点）
-
-> **遇到的问题**：偶尔网页上 **AT 全部转圈圈无响应**，但 `ps | grep socat` 看着一切正常。
-
-**为什么 `ps | grep socat` 判断不了**：AT 通路是 **4 个独立部件**拼起来的，其中只有 1 个叫 socat，
-另外 2 条搬运腿是 busybox 的 `cat`，**永远不会被 `grep socat` 匹配到**。
-所以 `ps | grep socat` 只看到 1 条 socat 是**正常形态**，不代表桥有问题。正确的检查方式是：
-
-```bash
-sh /userdata/simcom-webui/socat-at-bridge/bridge_status.sh
-```
-
-它会逐项给出 9 个检查点：AT 设备节点 / socat / PTY 节点 / **读腿** / **写腿** / 孤儿读线程 /
-真实 AT 环回探活 / **web 侧 AT 心跳** / **运行时目录落点（是否在写 NAND）**，最后给结论
-（`结论：桥接正常` 或 `结论：桥接异常` + 修复命令）。
-
-**故障根因（两个，都已修）**：
-
-1. **孤儿读线程偷吃响应**（最主要，「全部无响应」的直接原因）
-   CGI 用后台 `cat /dev/ttyOUT2` 收数据。浏览器切页 / 刷新 / 关标签时，lighttpd 会杀掉 CGI 主进程，
-   那个后台 `cat` 被 init 收养（`ppid=1`）却继续握着 `/dev/ttyOUT2` 读。PTY 只有一个读队列，
-   谁先读谁拿到数据 → 之后每个 CGI 都读不到自己的响应，且**不会自愈，一直持续到重启**。
-   → 修复：`libat.sh` 增加 `sweep_orphan_readers()`（清 `ppid=1` 且读 ttyOUT2 的 cat）+ 统一 `trap` 回收自身读线程。
-   枚举孤儿优先读内核给的 `/proc/1/task/1/children`（一次文件读），不再逐 pid `fork` 去读 cmdline。
-
-2. **桥的 3 个部件没有任何守护**
-   任意一条腿因 `EIO`/`ENXIO`/`SIGHUP` 退出，通路就断了；而且原来的
-   `while true; do cat ...; sleep 0.5; done` 在重启那 0.5s 里会把模块的响应直接丢掉。
-   → 修复：新增 `bridge_watchdog.sh`，巡检部件存活 + **带锁**的真实 AT 环回探活，
-   连续 2 次异常即整桥重建；并顺带清理与 systemd 三件套的抢占。
-
-**看门狗的检查节奏：分级 + 按需（不无脑轮询）**
-
-早先的实现是每 10s「全量扫 `/proc` + 发一条 `AT`」，实测开销远大于直觉：
-
-| 开销项 | 量级 |
-|---|---|
-| 扫 `/proc` 找孤儿：每个 pid 起一个 `tr` 读 cmdline | 模块上 150+ 进程 → **每轮约 150 次 fork**，15 次/秒持续不断 |
-| 每 10s 一条 AT 探活 | 要和网页请求抢 `/tmp/atcmd.lock`，给正常浏览白添延迟；没人用网页时毫无信息量 |
-
-现在改成三层，**没人用网页时几乎零开销，网页自己就是最好的探活**：
-
-| 层 | 频率 | 做什么 | 成本 |
-|---|---|---|---|
-| **L0** | 每 10s | 读 pidfile + `/proc/<pid>/comm` + 判断字符设备，覆盖「某条腿退出 / PTY 节点消失」 | **0 次 fork**（全是 shell 内建） |
-| **L1** | 按需 | 读 web 侧心跳：`ok` 新鲜 → 不碰串口；`fail` / 请求卡死 → 清孤儿 + 探活 + 必要时重建 | 仅真出问题时 |
-| **L2** | 静默期每 300s | 超过 120s 没有 web 活动时，低频兜底探活一次 | 1 次 AT / 5 分钟 |
-
-心跳由 `cgi-bin/libat.sh` 写入（每次 AT 往返后落一个小文件，不碰串口所以不干扰其他请求）。
-落点是**运行时目录**（内存 fs，见「NAND 写入治理」一节），下表用 `$RUNDIR` 代指：
-
-| 文件 | 内容 | 用途 |
-|---|---|---|
-| `$RUNDIR/bridge/at_hb` | `<epoch> ok` / `<epoch> fail` | 最近一次往返成功 or 超时 |
-| `$RUNDIR/bridge/at_hb_start` | `<epoch>` | 请求开始时刻；比结果标记新 60s 以上 = 卡死 |
-
-> 心跳写入带 45s 最小间隔：状态没变且时间戳还新鲜就跳过，把开自动刷新时的
-> 「每 5s 一次」压到「每 45s 一次」。
-
-> 判定「卡死」为什么要开始标记：孤儿读线程偷响应时 CGI 会一直卡在轮询里，**不会写出任何结果** ——
-> 只看 `at_hb` 会以为「没消息就是好消息」。
-
-**看门狗用法**：
+### 桥接健康检查与自愈
+**看门狗+自检脚本**：
 
 ```bash
 sh socat-at-bridge/bridge_watchdog.sh            # 常驻（开机自启已接）
@@ -256,38 +195,6 @@ cat /tmp/simcom-webui/log/bridge.log             # 看门狗日志（含"检查�
    串行化后每个请求的超时从「真正开始」计时，行为可预期。
    另外 `libat.sh` 的锁等待上限从 **300 秒收敛到 60 秒**（原值会让页面干转 5 分钟）。
 
-### 开机自启自愈（重点）
-
-> **遇到的问题**：装了 `systemctl enable` 后当时显示 enabled，但**模块重启后不自启、service 变回 disabled**。
-> **根因**：SDX62/高通的 rootfs 常把 `/etc` 做成 **tmpfs 或内存 overlay（upperdir 落在 /tmp、/dev、/run 等内存分区）**。
-> 这种情况下 `enable` 的链接**运行时写入是成功的**（touch/systemctl 都不报错），但链接写在易失层里，**重启即消失** → service 退回 disabled。
-> 只靠 `touch` 判"可写"会误判：`/etc` 可写（写入落在内存上层）≠ enable 能跨重启持久。
-
-修复后的自启体系分三层，`install.sh` 部署时**无条件**写入 `/etc/init.post_boot.sh` 钩子并自动补齐持久兜底：
-
-1. **`/etc/init.post_boot.sh` 钩子（关键，高通 SDX62 开机脚本）**：`install.sh` 部署时调用 `fix_systemd_autostart.sh`，把自启命令幂等追加到模块固件每次开机都会执行的 `/etc/init.post_boot.sh`，跨重启稳定生效，不依赖 systemd。
-2. **持久自启脚本**：`fix_systemd_autostart.sh` 在**持久分区**生成 `/userdata/simcom-webui/autostart.sh`（真正的启动逻辑：等待 AT 设备就绪 → `bridge_watchdog.sh --restart` 重建桥 + `setsid` 起常驻看门狗 → 起 lighttpd，不依赖 /etc）。`/etc/init.post_boot.sh`、`/etc/init.d`、`rc.local` 都只是转发引用它。
-3. **systemd enable（辅助）**：`systemctl enable` 4 个 unit（socat 桥 ×3 + webui），配合 `/etc` 易失性检测，作为第一优先路径的补充。
-
-> `install.sh` 同时会检测 `/etc` 是否易失（tmpfs / overlay-upper 落内存），但**无论是否易失**都会写 `/etc/init.post_boot.sh` 钩子兜底，避免"可写但易失"漏判导致自启失效。
-
-复检命令：
-
-```bash
-sh /userdata/simcom-webui/socat-at-bridge/fix_systemd_autostart.sh   # 显示各服务的 enabled=/active=
-systemctl is-enabled simcom-webui.service
-grep simcom-webui /etc/init.post_boot.sh   # 应能看到自启钩子
-ls -la /dev/ttyIN2 /dev/ttyOUT2            # 桥接设备应存在
-```
-
-手动立即启动一次（验证脚本本身正常）：
-
-```bash
-sh /userdata/simcom-webui/autostart.sh &
-```
-
----
-
 ## ⚙️ CGI 并发保护
 
 - 多个页面会并发发 AT 命令 → 后端 CGI 用 `mkdir` 原子锁串行化（锁路径由 `at-runenv.sh` 解析，落在内存 fs）
@@ -297,9 +204,7 @@ sh /userdata/simcom-webui/autostart.sh &
 - 前端 `wb-theme.js` 另外把 `/cgi-bin/atcmd` 请求在客户端串行化成一条链，避免并发堆在服务端排队
 - 每次命令前用固定 150ms 短读清空 PTY 残留，避免响应串线/冗余
 - `send_at` 用「写命令 + 后台 cat 读 + 轮询 OK/ERROR/超时」，抓到终止符后先读静默再 kill，保证零残留
-
 ---
-
 ## 💾 NAND 写入治理（日志/心跳/锁/临时文件不写闪存）
 
 > **背景**：本模块是 **1GB NAND + UBIFS**，擦写寿命有限，而本项目的"高频写入"其实不少：
@@ -310,96 +215,6 @@ sh /userdata/simcom-webui/autostart.sh &
 新增 `at-runenv.sh` 统一解析：直接读 `/proc/mounts` 判定 fs 类型，只在 `tmpfs`/`ramfs` 上建目录，
 按 `/dev/shm → /run → /tmp → /var/tmp` 顺序取第一个可写的内存目录；全都不行才退回 `/tmp` 并把
 `AT_RUN_IS_RAM=0` 暴露给上层**主动告警**（`bridge_status.sh` 第 [9] 项、看门狗启动日志、`--rundir`）。
-
-所有 CGI 与桥脚本 `source` 同一个 `at-runenv.sh`，因此**锁路径、心跳路径、日志目录两边看到的一定一致**。
-
-| 写入源 | 原落点 | 现落点 |
-|---|---|---|
-| AT 心跳 `at_hb` / `at_hb_start` | `/tmp/simcom-webui-bridge/` | `$RUNDIR/bridge/`（内存，且带 45s 写间隔） |
-| 串口互斥锁 `atcmd.lock` | 各自硬编码 `/tmp/...` | `$RUNDIR/atcmd.lock`（CGI 与看门狗共用同一把） |
-| 看门狗 pidfile ×4 / bridge.log | `/tmp/simcom-webui-bridge/` | `$RUNDIR/bridge/`、`$RUNDIR/log/` |
-| CGI 临时文件（`mktemp`） | 系统默认 | `TMPDIR=$RUNDIR/tmp` |
-| lighttpd errorlog / tmpdir | 默认（可能写盘） | `@RUNDIR@/…`（install.sh 安装时替换） |
-| lighttpd **accesslog** | 若开启则每请求一次写 | **刻意不开启**（单客户端，排查看 errorlog 即可） |
-| 开机自启三份日志 | `/tmp` append，跨重启无限增长 | `$RUNDIR/log/`，且**每次开机 `: >` 清空** |
-
-补充：
-- 日志做**字节封顶**（`at_log_cap`：超 256KiB 截断为最近 64KiB），即使兜底落在 `/tmp` 也不会写满分区。
-- 看门狗 `_kill_pidfile` 带 cmdline 关键字匹配，避免 pid 复用误杀；探活锁带僵尸回收。
-- **密码文件 `.htpasswd` 例外**：它必须持久保存（落 `/userdata`），不属于本次治理范围。
-
-自检（确认真的没在写 NAND）：
-
-```bash
-sh .../bridge_watchdog.sh --rundir     # 直接打印日志/心跳/锁/临时文件的落点 + fs 类型 + 是否在内存
-sh .../bridge_status.sh                # 第 [9] 项给结论
-```
-
----
-
-## ✅ 真机验证结果（SIM8260 / SDX62）
-
-`/proc/mounts` 实测拓扑：`/dev/shm`、`/run`、`/tmp` **三个都是 tmpfs**；
-`/etc`、`/userdata` 是 `ubi2_0`（NAND）。解析器选中的落点 = **`/dev/shm/simcom-webui`**（`AT_RUN_IS_RAM=1`）。
-
-| 验证项 | 结果 |
-|---|---|
-| `at-runenv.sh` 在设备上 source | `dir=/dev/shm/simcom-webui  fs=tmpfs  ram=1` ✅ |
-| lighttpd.conf 的 `@RUNDIR@` 替换 | `server.errorlog`/`tmpdir` 均 = `/dev/shm/simcom-webui/…`，无 accesslog ✅ |
-| `bridge_status.sh` 9 项 | 全 `[OK]`（含第 [7] 项真实 AT 环回 **收到 OK**、第 [9] 项内存落点）✅ |
-| 端到端 `curl -u admin:admin …/cgi-bin/atcmd?cmd=AT` | 返回 `OK`；首页 `200`；`sysinfo` 正常 ✅ |
-| pidfile ↔ `ps` 对应 | socat / reader / writer / watchdog 四个 pid **逐一对应** ✅ |
-| 稳定性（≥40s，4 个 L0 周期） | `bridge.log` 行数 **不再增长**（修复前每 10s 重建一次）✅ |
-| NAND 审计 | `find /userdata/simcom-webui -name '*.log' -o -name '*.pid' -o -name 'at_hb*'` → **空** ✅ |
-| 桥进程唯一性 | 1×socat、1×读腿、1×写腿、1×看门狗守护；旧 `socat-*.service` 已清除 ✅ |
-
----
-
-## 🐞 已修复的缺陷（本轮代码走查）
-
-**后端 / 桥脚本**
-
-| 缺陷 | 后果 | 修复 |
-|---|---|---|
-| `send_at_batch` 漏登记后台读线程 | 批量命令（最长 8~20s）期间浏览器切页 → cat 变孤儿偷吃响应，**AT 全部转圈圈** | 补 `AT_BG_PIDS` 登记 |
-| `acquire_at_lock` 无法回收"无 ts"僵尸锁 | 持有者死在 `mkdir`↔写 `ts` 之间 → 之后**每个请求都干等满 60s**，重启前不可自愈 | 加 `_lock_nots` ≥10s 强制回收 |
-| `pkill`/`kill` 按 pidfile 盲杀 | pid 复用 → 误杀无关进程 | `_kill_pidfile` 增加 cmdline 关键字匹配 |
-| 手工建 PTY symlink 时用探活判方向 | 此刻两条腿还没起，探活必然失败 → 方向被**必然交换**（自环） | 改为确定性 fd 顺序；方向纠正移到两条腿起来之后的 `restart_bridge` |
-| `socat` 起来但 `pty,link=` 失效 | `/dev/ttyIN2\|ttyOUT2` 不存在，桥不可用 | 从 `/proc/<pid>/fd` 捞 pts 手工建 symlink（回归修复） |
-| 日志无限增长 | 长期运行写满分区 / 磨闪存 | `at_log_cap` 字节封顶 + 开机清空 |
-| `acquire_at_lock` 参数写死 `/tmp` | 与看门狗抢的不是同一把锁 → 探活插进 CGI 响应 | 统一由 `at-runenv.sh` 解析 |
-| `install.sh` 未安装 `at-runenv.sh` / 未替换 `@RUNDIR@` | 所有 CGI 静默退回 `/tmp`（可能是 NAND），**NAND 治理失效** | 补拷贝 + 补 `sed` 替换 |
-| **桥接双 owner**：`install.sh` enable 了 3 个 `socat-*.service`，而桥实际归看门狗管 | 两套同时拉起 → 两个 socat 抢 `/dev/ttyIN2`、多个 `cat` 抢读 `/dev/smd8` → **时通时不通 / AT 全部转圈圈**（真机复现） | `install.sh` 改为停用+删除这些单元，走 `start_socat_bridge.sh` 起桥 |
-| **`fix_systemd_autostart.sh` 会把上面删掉的单元又重建并 enable** | 前一步的停用被无声撤销 → 双 owner 复现 | 该脚本改为只维护 `simcom-webui.service`，桥接单元一律清除 |
-| **`start_socat`/`start_leg` 用 `$!` 记 pid** | `_spawn ...&` 里 `$!` 是 ash 为跑函数而 fork 的**子 shell**，随即退出 → pidfile 存了死 pid → L0 每 10s 判"部件缺失"→**无限重建**（实测 10 分钟 20 次，pts 编号每轮都变，AT 基本不可用） | 新增 `resolve_pid()`：按 `/proc/<pid>/comm` + cmdline 关键字解析**真实** pid |
-| `scan_pid "cat" "/dev/ttyIN2"` 找写腿 | socat 的 cmdline 同时含子串 `cat`（在 `socat` 里）与 `/dev/ttyIN2` → **把 socat 认成写腿** | 用 `comm` 精确区分（socat 的 comm 不是 `cat`） |
-| `kill_legacy_bridge` 只杀 ppid=1 的启动器 | 旧版**读腿** `cat /dev/smd8` 的 ppid 是启动器不是 1 → 漏杀 → 与新腿抢读 AT 口 | 追加按 cmdline 含 `cat /dev/smd` 清扫，且必须在 `start_leg` 之前 |
-| `autostart.sh` 与 `simcom-webui.service` 都拉 lighttpd | 两个 lighttpd 抢 8888，后 bind 的失败并反复重启 | `autostart.sh` 先看 `systemctl is-enabled`，已 enable 就交给 systemd |
-| `install.sh` 直接 `cp` 正在运行的 `socat-armel-static` | `Text file busy` → 二进制更新失败 | 先写 `.new` 再 `mv` 覆盖（运行中进程仍持旧 inode，不中断桥） |
-| `install.sh` 解析 HTTP 状态用 `wget -O- ... \| tail -1` | 响应正文混进结果 → 打印出 `HTTP status: server` | 改 `-O /dev/null` + 取第一行，并区分 200/30x/401 |
-
-**CGI 安全/健壮性**
-
-| 缺陷 | 后果 | 修复 |
-|---|---|---|
-| `QUERY_STRING` 未关 glob | URL 里的 `*?[]` 被 shell 当通配符匹配 cgi-bin 文件，**参数被篡改** | 加 `set -f`（atcmd/sms/shell/password） |
-| `sms` 的 `index`/`num` 未校验 | `num=1"<CR>AT+CFUN=0` 可**拆出新的 AT 命令**（AT 层注入） | index 纯数字校验、num 白名单 `0-9+*#` |
-| `sms` 只校验 ASCII 长度 | UCS2 长短信绕过 70 字上限 | 先编码再数 `${#CMGS_MSG}/4` |
-| `shell` 黑名单裸子串 | 既误杀（`cat /proc/arm`），又能用 `wget -O`、`busybox rm`、`find -delete` 绕过 | 改词首锚定 + 补 applet/`find` 动作/敏感文件拦截 |
-| `shell` 超时只杀父进程 | `ping` 子进程活着并握着 `$OUT` 写端 → **CGI 挂死** | `_kill_tree` 按 PPid 杀整棵子树 |
-| `password` 顶部无条件建 `.htpasswd` | `action=reset` 的 `[ -f ]` 判断恒真 → **reset 是死代码** | `reset` 时跳过自动初始化 |
-| `openssl passwd` 用位置参数传密码 | 密码以 `-` 开头会被当选项 | 优先 `-stdin`，失败回退位置参数 |
-
-**前端**
-
-| 缺陷 | 后果 | 修复 |
-|---|---|---|
-| `sms.html` 合并短信 `onclick` 用 `JSON.stringify` 拼进双引号属性 | 正文含引号/换行时属性被提前截断 → **合并短信点了没反应** | 改 `data-*` + 渲染后 `addEventListener` 绑定 |
-| `sms.html` 调用未定义的 `decodeSmsText` | 文本模式回退路径抛 `ReferenceError` → 列表空白 | 补齐 `decodeSmsText` 定义 |
-| `network.html` 锁定状态只看"行是否存在" | `+CCELLCFG?` 未锁定时也回该行 → 未锁也显示"**已锁定**" | 改判首参（`pci=0` = 未锁定）；NR 同样处理 |
-| 并发 AT 无客户端排队 | 进页面即多路并发，一条卡住全部等到超时 | `wb-theme.js` 对 `/cgi-bin/atcmd` 串行化 |
-
----
 
 ## 📝 与参考项目的差异
 
