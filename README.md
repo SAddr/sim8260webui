@@ -166,69 +166,8 @@ SIM8260 的 AT 口 `/dev/smdX` 如果和电脑 USB AT COM 口共用通道会冲�
 > 注意方向只能在**两条搬运腿起来之后**用真实探活判定（见 `restart_bridge`），
 > 启动 socat 时探活必然超时，不能拿它当"接反了"的依据。
 
-### 桥接健康检查与自愈（重点）
 
-> **遇到的问题**：偶尔网页上 **AT 全部转圈圈无响应**，但 `ps | grep socat` 看着一切正常。
-
-**为什么 `ps | grep socat` 判断不了**：AT 通路是 **4 个独立部件**拼起来的，其中只有 1 个叫 socat，
-另外 2 条搬运腿是 busybox 的 `cat`，**永远不会被 `grep socat` 匹配到**。
-所以 `ps | grep socat` 只看到 1 条 socat 是**正常形态**，不代表桥有问题。正确的检查方式是：
-
-```bash
-sh /userdata/simcom-webui/socat-at-bridge/bridge_status.sh
-```
-
-它会逐项给出 9 个检查点：AT 设备节点 / socat / PTY 节点 / **读腿** / **写腿** / 孤儿读线程 /
-真实 AT 环回探活 / **web 侧 AT 心跳** / **运行时目录落点（是否在写 NAND）**，最后给结论
-（`结论：桥接正常` 或 `结论：桥接异常` + 修复命令）。
-
-**故障根因（两个，都已修）**：
-
-1. **孤儿读线程偷吃响应**（最主要，「全部无响应」的直接原因）
-   CGI 用后台 `cat /dev/ttyOUT2` 收数据。浏览器切页 / 刷新 / 关标签时，lighttpd 会杀掉 CGI 主进程，
-   那个后台 `cat` 被 init 收养（`ppid=1`）却继续握着 `/dev/ttyOUT2` 读。PTY 只有一个读队列，
-   谁先读谁拿到数据 → 之后每个 CGI 都读不到自己的响应，且**不会自愈，一直持续到重启**。
-   → 修复：`libat.sh` 增加 `sweep_orphan_readers()`（清 `ppid=1` 且读 ttyOUT2 的 cat）+ 统一 `trap` 回收自身读线程。
-   枚举孤儿优先读内核给的 `/proc/1/task/1/children`（一次文件读），不再逐 pid `fork` 去读 cmdline。
-
-2. **桥的 3 个部件没有任何守护**
-   任意一条腿因 `EIO`/`ENXIO`/`SIGHUP` 退出，通路就断了；而且原来的
-   `while true; do cat ...; sleep 0.5; done` 在重启那 0.5s 里会把模块的响应直接丢掉。
-   → 修复：新增 `bridge_watchdog.sh`，巡检部件存活 + **带锁**的真实 AT 环回探活，
-   连续 2 次异常即整桥重建；并顺带清理与 systemd 三件套的抢占。
-
-**看门狗的检查节奏：分级 + 按需（不无脑轮询）**
-
-早先的实现是每 10s「全量扫 `/proc` + 发一条 `AT`」，实测开销远大于直觉：
-
-| 开销项 | 量级 |
-|---|---|
-| 扫 `/proc` 找孤儿：每个 pid 起一个 `tr` 读 cmdline | 模块上 150+ 进程 → **每轮约 150 次 fork**，15 次/秒持续不断 |
-| 每 10s 一条 AT 探活 | 要和网页请求抢 `/tmp/atcmd.lock`，给正常浏览白添延迟；没人用网页时毫无信息量 |
-
-现在改成三层，**没人用网页时几乎零开销，网页自己就是最好的探活**：
-
-| 层 | 频率 | 做什么 | 成本 |
-|---|---|---|---|
-| **L0** | 每 10s | 读 pidfile + `/proc/<pid>/comm` + 判断字符设备，覆盖「某条腿退出 / PTY 节点消失」 | **0 次 fork**（全是 shell 内建） |
-| **L1** | 按需 | 读 web 侧心跳：`ok` 新鲜 → 不碰串口；`fail` / 请求卡死 → 清孤儿 + 探活 + 必要时重建 | 仅真出问题时 |
-| **L2** | 静默期每 300s | 超过 120s 没有 web 活动时，低频兜底探活一次 | 1 次 AT / 5 分钟 |
-
-心跳由 `cgi-bin/libat.sh` 写入（每次 AT 往返后落一个小文件，不碰串口所以不干扰其他请求）。
-落点是**运行时目录**（内存 fs，见「NAND 写入治理」一节），下表用 `$RUNDIR` 代指：
-
-| 文件 | 内容 | 用途 |
-|---|---|---|
-| `$RUNDIR/bridge/at_hb` | `<epoch> ok` / `<epoch> fail` | 最近一次往返成功 or 超时 |
-| `$RUNDIR/bridge/at_hb_start` | `<epoch>` | 请求开始时刻；比结果标记新 60s 以上 = 卡死 |
-
-> 心跳写入带 45s 最小间隔：状态没变且时间戳还新鲜就跳过，把开自动刷新时的
-> 「每 5s 一次」压到「每 45s 一次」。
-
-> 判定「卡死」为什么要开始标记：孤儿读线程偷响应时 CGI 会一直卡在轮询里，**不会写出任何结果** ——
-> 只看 `at_hb` 会以为「没消息就是好消息」。
-
-**看门狗用法**：
+**看门狗**：
 
 ```bash
 sh socat-at-bridge/bridge_watchdog.sh            # 常驻（开机自启已接）
@@ -256,37 +195,6 @@ cat /tmp/simcom-webui/log/bridge.log             # 看门狗日志（含"检查�
    串行化后每个请求的超时从「真正开始」计时，行为可预期。
    另外 `libat.sh` 的锁等待上限从 **300 秒收敛到 60 秒**（原值会让页面干转 5 分钟）。
 
-### 开机自启自愈（重点）
-
-> **遇到的问题**：装了 `systemctl enable` 后当时显示 enabled，但**模块重启后不自启、service 变回 disabled**。
-> **根因**：SDX62/高通的 rootfs 常把 `/etc` 做成 **tmpfs 或内存 overlay（upperdir 落在 /tmp、/dev、/run 等内存分区）**。
-> 这种情况下 `enable` 的链接**运行时写入是成功的**（touch/systemctl 都不报错），但链接写在易失层里，**重启即消失** → service 退回 disabled。
-> 只靠 `touch` 判"可写"会误判：`/etc` 可写（写入落在内存上层）≠ enable 能跨重启持久。
-
-修复后的自启体系分三层，`install.sh` 部署时**无条件**写入 `/etc/init.post_boot.sh` 钩子并自动补齐持久兜底：
-
-1. **`/etc/init.post_boot.sh` 钩子（关键，高通 SDX62 开机脚本）**：`install.sh` 部署时调用 `fix_systemd_autostart.sh`，把自启命令幂等追加到模块固件每次开机都会执行的 `/etc/init.post_boot.sh`，跨重启稳定生效，不依赖 systemd。
-2. **持久自启脚本**：`fix_systemd_autostart.sh` 在**持久分区**生成 `/userdata/simcom-webui/autostart.sh`（真正的启动逻辑：等待 AT 设备就绪 → `bridge_watchdog.sh --restart` 重建桥 + `setsid` 起常驻看门狗 → 起 lighttpd，不依赖 /etc）。`/etc/init.post_boot.sh`、`/etc/init.d`、`rc.local` 都只是转发引用它。
-3. **systemd enable（辅助）**：`systemctl enable` 4 个 unit（socat 桥 ×3 + webui），配合 `/etc` 易失性检测，作为第一优先路径的补充。
-
-> `install.sh` 同时会检测 `/etc` 是否易失（tmpfs / overlay-upper 落内存），但**无论是否易失**都会写 `/etc/init.post_boot.sh` 钩子兜底，避免"可写但易失"漏判导致自启失效。
-
-复检命令：
-
-```bash
-sh /userdata/simcom-webui/socat-at-bridge/fix_systemd_autostart.sh   # 显示各服务的 enabled=/active=
-systemctl is-enabled simcom-webui.service
-grep simcom-webui /etc/init.post_boot.sh   # 应能看到自启钩子
-ls -la /dev/ttyIN2 /dev/ttyOUT2            # 桥接设备应存在
-```
-
-手动立即启动一次（验证脚本本身正常）：
-
-```bash
-sh /userdata/simcom-webui/autostart.sh &
-```
-
----
 
 ## ⚙️ CGI 并发保护
 
