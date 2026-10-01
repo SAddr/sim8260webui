@@ -307,6 +307,10 @@ pkill -f "lighttpd.*simcom-webui" 2>/dev/null || true
 kill $(cat "$AT_RUN_DIR/simcom-webui-lighttpd.pid" 2>/dev/null) 2>/dev/null || true
 sleep 1
 
+# 重建 lighttpd 的 tmpdir（tmpfs 重启即清空；重部署时也必须确保存在，
+# 否则下段 systemctl restart / 手动启动会因 tmpdir 不存在而失败）
+mkdir -p "$AT_RUN_DIR/lighttpd-tmp" 2>/dev/null || true
+
 if [ "$HAS_SYSTEMD" = "1" ]; then
     systemctl daemon-reload 2>/dev/null || true
     systemctl enable $SERVICE_FILE 2>/dev/null || true

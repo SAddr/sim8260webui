@@ -7,6 +7,9 @@ Wants=network.target
 Type=simple
 # 注意：Type=simple 下不要配置 PIDFile。
 # lighttpd -D 以前台方式运行，由 systemd 直接管理进程。
+# tmpfs（/dev/shm 等）重启即清空，lighttpd 的 tmpdir 必须存在否则进程启动即退出。
+# 先 source 运行时目录解析(at-runenv.sh)并重建该目录，再跑配置自检与启动。
+ExecStartPre=/bin/sh -c '. /usrdata/simcom-webui/at-runenv.sh 2>/dev/null; mkdir -p "${AT_RUN_DIR:-/dev/shm/simcom-webui}/lighttpd-tmp" 2>/dev/null || true'
 ExecStartPre=/opt/sbin/lighttpd -tt -f /usrdata/simcom-webui/systemd/lighttpd.conf
 ExecStart=/opt/sbin/lighttpd -D -f /usrdata/simcom-webui/systemd/lighttpd.conf
 Restart=always

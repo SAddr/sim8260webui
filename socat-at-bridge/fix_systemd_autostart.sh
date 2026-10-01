@@ -244,6 +244,10 @@ sleep 3
 #      systemd 管理 —— 它带 Restart=always，崩溃能自愈。只有 systemd 不可用
 #      或单元未 enable 时，才由本脚本 setsid 兜底启动。
 #      两者同时拉会冒出两个 lighttpd 抢 8888：后 bind 的失败并反复重启。
+# 启动前确保 lighttpd 的 tmpdir 存在（at-runenv.sh 已建，但这里再兜底一次：
+# tmpfs 重启即清空，且 systemd 拉起本脚本与 lighttpd 的时序不固定，建目录必须抢在
+# lighttpd 真正 ExecStart 之前完成，否则 lighttpd 会因 tmpdir 不存在而启动失败）。
+[ -n "$AT_RUN_DIR" ] && mkdir -p "$AT_RUN_DIR/lighttpd-tmp" 2>/dev/null
 LIGHTTPD=$(command -v lighttpd || echo /opt/sbin/lighttpd)
 _SYSD=0
 command -v systemctl >/dev/null 2>&1 && systemctl is-enabled simcom-webui.service >/dev/null 2>&1 && _SYSD=1

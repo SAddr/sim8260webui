@@ -79,14 +79,20 @@ else
 fi
 
 # 建目录树；如果首选位置建不出来（tmpfs 只读 / 空间不足），退到 /tmp
-if ! mkdir -p "$AT_RUN_DIR/bridge" "$AT_RUN_DIR/log" "$AT_RUN_DIR/tmp" 2>/dev/null; then
+# 注意：lighttpd-tmp 必须在此一并建立 —— lighttpd.conf 的 tmpdir 指向它，
+# 而该目录在 tmpfs（/dev/shm 等）上，重启即清空。若此处不建，reboot 后
+# lighttpd 启动会因 tmpdir 不存在而直接退出，表现为「概率性起不来 / 重启后打不开」。
+if ! mkdir -p "$AT_RUN_DIR/bridge" "$AT_RUN_DIR/log" "$AT_RUN_DIR/tmp" "$AT_RUN_DIR/lighttpd-tmp" 2>/dev/null; then
     if [ "$AT_RUN_DIR" != "/tmp/simcom-webui" ]; then
         AT_RUN_IS_RAM=0
         AT_RUN_DIR="/tmp/simcom-webui"
         AT_RUN_FS=$(_simcom_fs_of "$AT_RUN_DIR")
-        mkdir -p "$AT_RUN_DIR/bridge" "$AT_RUN_DIR/log" "$AT_RUN_DIR/tmp" 2>/dev/null
+        mkdir -p "$AT_RUN_DIR/bridge" "$AT_RUN_DIR/log" "$AT_RUN_DIR/tmp" "$AT_RUN_DIR/lighttpd-tmp" 2>/dev/null
     fi
 fi
+# lighttpd 临时文件目录（对应 lighttpd.conf 的 tmpdir 指令），统一由本文件创建。
+AT_LIGHTTPD_TMP_DIR="$AT_RUN_DIR/lighttpd-tmp"
+
 # 兜底：只要不是 tmpfs/ramfs，就一律认为「没落在内存上」，供上层告警
 if [ "$AT_RUN_IS_RAM" = "1" ]; then
     [ -n "$AT_RUN_FS" ] || AT_RUN_FS=$(_simcom_fs_of "$AT_RUN_DIR")
@@ -111,7 +117,7 @@ export TMPDIR
 
 # 权限：CGI 由 lighttpd 以非 root 身份 fork（本平台通常是 root，但别赌），
 # 心跳/锁目录必须让所有相关进程都能写。
-chmod 777 "$AT_RUN_DIR" "$AT_STATE_DIR" "$AT_LOG_DIR" "$AT_TMP_DIR" 2>/dev/null
+chmod 777 "$AT_RUN_DIR" "$AT_STATE_DIR" "$AT_LOG_DIR" "$AT_TMP_DIR" "$AT_LIGHTTPD_TMP_DIR" 2>/dev/null
 
 # 单个日志文件上限（字节）。日志只用于排查，超限直接截断而不是无限增长 ——
 # 即使 /tmp 不是内存，也不会把分区写满。
